@@ -3,46 +3,47 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Notepad++ Regex Auto Formatter</title>
+<title>OCR Credential Record Formatter V9</title>
 <style>
 body{margin:0;background:#101216;color:#eee;font:14px Arial,sans-serif}
-.wrap{max-width:1200px;margin:auto;padding:22px}
-h1{margin:0 0 8px}
-.sub{color:#abb3bf;line-height:1.5}
+.wrap{max-width:1250px;margin:auto;padding:22px}
+h1{margin:0 0 8px}.sub{color:#aeb7c4;line-height:1.5}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .card{background:#191d24;border:1px solid #303744;border-radius:14px;padding:15px}
 label{font-weight:700;display:block;margin-bottom:8px}
-textarea{width:100%;height:550px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;padding:13px;font:14px/1.5 Consolas,monospace}
+textarea{width:100%;height:590px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;padding:13px;font:14px/1.5 Consolas,monospace}
 .row{display:flex;gap:9px;flex-wrap:wrap;margin-top:10px}
 button{border:0;border-radius:8px;padding:10px 14px;background:#2563eb;color:white;font-weight:bold;cursor:pointer}
 button.secondary{background:#4b5563}.danger{background:#b42318}
 .box{margin-top:15px;padding:13px;border:1px solid #303744;border-radius:10px;background:#151922;color:#cbd5e1;line-height:1.7;font-size:13px}
 .check{display:inline-flex;gap:6px;margin-right:18px;font-weight:normal}
 .status{margin-top:10px;color:#abb3bf}
-@media(max-width:850px){.grid{grid-template-columns:1fr}textarea{height:400px}}
+code{word-break:break-all}
+@media(max-width:850px){.grid{grid-template-columns:1fr}textarea{height:430px}}
 </style>
 </head>
 <body>
 <div class="wrap">
-<h1>Notepad++ Regex Auto Formatter</h1>
-<p class="sub">This version correctly applies the regex-style operations in the same order as your Notepad++ workflow.</p>
+<h1>OCR Record Formatter V9</h1>
+<p class="sub">Designed for messy OCR text: blank lines separate records, number-only OCR lines are removed, auth-style lines are recognized separately, and 2/3-line blocks are reconstructed without crossing record boundaries.</p>
 
 <div class="grid">
 <div class="card">
 <label for="input">Input</label>
-<textarea id="input" spellcheck="false" placeholder="Paste your text here..."></textarea>
+<textarea id="input" spellcheck="false" placeholder="Paste OCR text here..."></textarea>
 
 <div class="box">
-<b>Automatic passes</b><br>
+<b>Automatic rules</b><br>
 <label class="check"><input id="removeNumbers" type="checkbox" checked> Remove number-only lines</label>
-<label class="check"><input id="threeLines" type="checkbox" checked> 3 lines → A:B:C</label>
-<label class="check"><input id="twoLines" type="checkbox" checked> 2 lines → A:B</label>
-<label class="check"><input id="removeBlank" type="checkbox" checked> Remove blank lines</label>
+<label class="check"><input id="authLines" type="checkbox" checked> Format auth/password/secret lines</label>
+<label class="check"><input id="threeLines" type="checkbox" checked> 3-line blocks → A:B:C</label>
+<label class="check"><input id="twoLines" type="checkbox" checked> 2-line blocks → A:B</label>
+<label class="check"><input id="blank" type="checkbox" checked> Remove blank lines from output</label>
 </div>
 
 <div class="row">
 <button id="process">Process</button>
-<button class="secondary" id="sample">Load sample</button>
+<button class="secondary" id="sample">Load test</button>
 <button class="danger" id="clear">Clear</button>
 </div>
 </div>
@@ -59,22 +60,14 @@ button.secondary{background:#4b5563}.danger{background:#b42318}
 </div>
 
 <div class="box">
-<b>Your Notepad++ patterns</b><br>
-3-line:
-<code>^([^\r\n]+)\R([^\r\n]+)\R([^\r\n]+)(?:\R[ \t]*)*</code><br>
-Replacement:
-<code>\1:\2:\3\r\n</code><br><br>
-
-2-line:
-<code>^([^\r\n]+)\R([^\r\n]+)</code><br>
-Replacement:
-<code>\1:\2\r\n</code><br><br>
-
-Remove space-only lines:
-<code>^\h*\R</code><br><br>
-
-Remove number-only lines:
-<code>^\h*\d+(?:\.\d+)?\h*\R</code>
+<b>Supported auth formats</b><br>
+<code>auth login: USER password: PASS secret: SECRET</code><br>
+<code>USER password: PASS secret: SECRET</code><br>
+Both become <code>USER:PASS:SECRET</code>.
+<br><br>
+<b>Record rule</b><br>
+Blank lines are boundaries. A block containing 3 meaningful non-number lines becomes <code>A:B:C</code>.
+A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line.
 </div>
 </div>
 
@@ -89,127 +82,229 @@ function normalizeNewlines(text) {
     return text.replace(/\r\n?/g, "\n");
 }
 
-function trimLine(s) {
+function cleanLine(s) {
     return s.trim();
 }
 
-/* Your number-removal regex:
-   ^\h*\d+(?:\.\d+)?\h*\R
+/*
+  Remove lines matching:
+  ^\h*\d+(?:\.\d+)?\h*\R
+
+  This deliberately removes only a line whose complete content is a
+  number or decimal number. It does NOT remove digits inside credentials.
 */
-function removeNumberLines(text) {
-    return text.replace(/^[ \t]*\d+(?:\.\d+)?[ \t]*\n/gm, "");
+function removeNumberOnlyLines(lines) {
+    return lines.filter(line => !/^[ \t]*\d+(?:\.\d+)?[ \t]*$/.test(line));
 }
 
 /*
-   Exact logical equivalent of your 3-line operation.
+  Remove trailing transaction suffixes such as:
+    " 12.06 txn 93"
+    " 11.98 txn 226"
+    " 11.97 txn 234"
 
-   We process record blocks separated by blank lines. This prevents the
-   2-line operation from accidentally joining two separate records.
+  Find what:
+  \s+\d+(?:\.\d+)?\s+txn\s+\d+\s*$
+
+  This is always enabled.
 */
-function formatThreeLineBlocks(text) {
-    const blocks = text.split(/\n[ \t]*\n+/);
-    const result = [];
-
-    for (const block of blocks) {
-        const lines = block
-            .split("\n")
-            .map(trimLine)
-            .filter(Boolean);
-
-        if (lines.length === 3) {
-            result.push(lines[0] + ":" + lines[1] + ":" + lines[2]);
-        } else {
-            result.push(lines.join("\n"));
-        }
-    }
-
-    return result.filter(Boolean).join("\n\n");
+function removeTxnSuffix(line) {
+    return line.replace(/\s+\d+(?:\.\d+)?\s+txn\s+\d+\s*$/i, "");
 }
 
 /*
-   Exact logical equivalent of your 2-line operation, but scoped to a
-   blank-line-separated block so records don't get mixed together.
+  Always remove !, ? and - wherever they occur in a line.
+  This is intentionally always enabled and has no on/off button.
 */
-function formatTwoLineBlocks(text) {
-    const blocks = text.split(/\n[ \t]*\n+/);
-    const result = [];
-
-    for (const block of blocks) {
-        const lines = block
-            .split("\n")
-            .map(trimLine)
-            .filter(Boolean);
-
-        if (lines.length === 2) {
-            result.push(lines[0] + ":" + lines[1]);
-        } else {
-            result.push(lines.join("\n"));
-        }
-    }
-
-    return result.filter(Boolean).join("\n\n");
+function removeLinePunctuation(line) {
+    return line.replace(/[!?\-]/g, "");
 }
 
-/* Your blank-line regex:
-   ^\h*\R
+/*
+  Full user-specified pattern:
+  (?i)^auth\\s+login:\\s*(\\S+)\\s+password:\\s*(\\S+)\\s+secret:\\s*(\\S+)\\s*$
+
+  Plus the OCR variant visible in the user's screenshot:
+  USER password: PASS secret: SECRET
+
+  The latter is important because OCR can drop "auth login:".
 */
-function removeBlankLines(text) {
-    return text.replace(/^[ \t]*\n/gm, "");
+function formatAuthLine(line) {
+    let m = line.match(
+        /^auth\s+login:\s*(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i
+    );
+
+    if (m) {
+        return m[1] + ":" + m[2] + ":" + m[3];
+    }
+
+    m = line.match(
+        /^(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i
+    );
+
+    if (m) {
+        return m[1] + ":" + m[2] + ":" + m[3];
+    }
+
+    return null;
+}
+
+/*
+  Process ONE blank-line-separated record.
+  This is intentionally isolated so no record can consume data from
+  the next record.
+*/
+function processBlock(rawLines, options) {
+    let lines = rawLines
+        .map(cleanLine)
+        .filter(Boolean);
+
+    if (!lines.length) return [];
+
+    // Remove standalone integer/decimal OCR artifacts before counting fields.
+    if (options.removeNumbers) {
+        lines = removeNumberOnlyLines(lines);
+    }
+
+    if (!lines.length) return [];
+
+    const result = [];
+    let rawBuffer = [];
+
+    function flushRawBuffer() {
+        if (!rawBuffer.length) return;
+
+        const vals = rawBuffer.slice();
+
+        if (vals.length === 3 && options.threeLines) {
+            result.push(vals[0] + ":" + vals[1] + ":" + vals[2]);
+        } else if (vals.length === 2 && options.twoLines) {
+            result.push(vals[0] + ":" + vals[1]);
+        } else if (vals.length === 1) {
+            result.push(vals[0]);
+        } else {
+            // Preserve unexpected data rather than incorrectly combining it.
+            for (const v of vals) result.push(v);
+        }
+
+        rawBuffer = [];
+    }
+
+    for (let line of lines) {
+        // Always-on cleanup requested by the user.
+        line = removeTxnSuffix(line);
+        line = removeLinePunctuation(line);
+        line = line.trim();
+
+        if (!line) continue;
+
+        if (options.authLines) {
+            const auth = formatAuthLine(line);
+
+            if (auth !== null) {
+                flushRawBuffer();
+                result.push(auth);
+                continue;
+            }
+        }
+
+        /*
+          A line already containing ":" is considered a finished record.
+          Do not merge it with surrounding OCR lines.
+        */
+        if (line.includes(":")) {
+            flushRawBuffer();
+            result.push(line);
+            continue;
+        }
+
+        rawBuffer.push(line);
+    }
+
+    flushRawBuffer();
+
+    return result;
 }
 
 function processText() {
-    let text = normalizeNewlines(input.value);
+    const options = {
+        removeNumbers: document.getElementById("removeNumbers").checked,
+        authLines: document.getElementById("authLines").checked,
+        threeLines: document.getElementById("threeLines").checked,
+        twoLines: document.getElementById("twoLines").checked
+    };
 
-    if (document.getElementById("removeNumbers").checked) {
-        text = removeNumberLines(text);
+    const text = normalizeNewlines(input.value);
+    const physicalLines = text.split("\n");
+
+    /*
+      CRITICAL:
+      Split on one or more blank/space-only lines BEFORE processing.
+      This keeps:
+        A
+        B
+
+        C
+        D
+      as A:B and C:D, never A:B:C.
+    */
+    const blocks = [];
+    let current = [];
+
+    for (const line of physicalLines) {
+        if (/^[ \t]*$/.test(line)) {
+            if (current.length) {
+                blocks.push(current);
+                current = [];
+            }
+        } else {
+            current.push(line);
+        }
     }
 
-    if (document.getElementById("threeLines").checked) {
-        text = formatThreeLineBlocks(text);
+    if (current.length) blocks.push(current);
+
+    const outputLines = [];
+
+    for (const block of blocks) {
+        const processed = processBlock(block, options);
+        outputLines.push(...processed);
     }
 
-    if (document.getElementById("twoLines").checked) {
-        text = formatTwoLineBlocks(text);
-    }
-
-    if (document.getElementById("removeBlank").checked) {
-        text = removeBlankLines(text);
-    }
-
-    output.value = text.trim();
+    output.value = options.removeNumbers
+        ? outputLines.filter(line => !/^[ \t]*\d+(?:\.\d+)?[ \t]*$/.test(line)).join("\n")
+        : outputLines.join("\n");
 
     const count = output.value ? output.value.split("\n").length : 0;
-    status.textContent = count + " output line(s) generated.";
+    status.textContent = count + " output line(s) generated from " + blocks.length + " record block(s).";
 }
 
 input.addEventListener("input", processText);
 document.getElementById("process").addEventListener("click", processText);
 
-document.getElementById("clear").addEventListener("click", function () {
+document.getElementById("clear").addEventListener("click", () => {
     input.value = "";
     output.value = "";
     status.textContent = "Cleared.";
     input.focus();
 });
 
-document.getElementById("copy").addEventListener("click", async function () {
+document.getElementById("copy").addEventListener("click", async () => {
     if (!output.value) {
         status.textContent = "Nothing to copy.";
         return;
     }
-
     try {
         await navigator.clipboard.writeText(output.value);
-    } catch (e) {
+    } catch {
         output.focus();
         output.select();
         document.execCommand("copy");
     }
-
     status.textContent = "Copied to clipboard.";
 });
 
-document.getElementById("download").addEventListener("click", function () {
+document.getElementById("download").addEventListener("click", () => {
     if (!output.value) {
         status.textContent = "Nothing to download.";
         return;
@@ -218,35 +313,53 @@ document.getElementById("download").addEventListener("click", function () {
     const blob = new Blob([output.value], {type:"text/plain;charset=utf-8"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-
     a.href = url;
     a.download = "formatted.txt";
     document.body.appendChild(a);
     a.click();
     a.remove();
-
     URL.revokeObjectURL(url);
     status.textContent = "Downloaded formatted.txt.";
 });
 
-document.getElementById("sample").addEventListener("click", function () {
+document.getElementById("sample").addEventListener("click", () => {
     input.value =
-`AAA
-BBB
-CCC
+`auth login: wvu7P4Qp password: JWMI51vVTT secret: X7ay025ISQSbc7Zo
 
-
-DDD
-EEE
-
+7PHT62t4
+Vh27JgoPJn
+sCt8FLnzW0OZvJqK
 0
 
-FFF
-GGG
+auth login: ZeMTL9dx password: hJ0tnEvgkE secret: wn7MiogCCc6Zp7a3
+
+7PHT62t4
+soe3Re9l
+cwScO6L2OC
+
+WDpVp2HO
+efCIATYWml
+mseS3RcyIpxClglN
 3
 
-HHH
-III`;
+BsnLx1sm
+sbsjmK6spP
+AgDF7i9wqHka6Acx
+
+MHTsyNCO
+kLRBghkiIP
+bHPhL5xvOuOIQHbf
+
+9vqtR0IG
+3gASTVVmHr
+OnSc9BgwAg76rsXT
+1.4
+
+oe9pjdYw password: avn0xU2zqX secret: MMKfP2b3YXTOep7g
+
+auth login: 9bZ3c5GM password: 0SATVsZZOH secret: AZ6s5pLUgwXPxOGU
+
+auth login: PHTn5bco password: ORm1JpYLQU secret: Yal332vTM720J4mJ`;
 
     processText();
 });
