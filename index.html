@@ -20,6 +20,9 @@ button.secondary{background:#4b5563}.danger{background:#b42318}
 .status{margin-top:10px;color:#abb3bf}
 code{word-break:break-all}
 @media(max-width:850px){.grid{grid-template-columns:1fr}textarea{height:430px}}
+
+.switch-row{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:14px}
+.switch-row input{width:18px;height:18px}
 </style>
 <style>#keepKeyword{padding:9px;border-radius:8px;border:1px solid #3b4350;background:#080a0e;color:#eee;min-width:260px}</style></head>
 <body>
@@ -27,7 +30,8 @@ code{word-break:break-all}
 <h1>OCR Record Formatter V9</h1>
 <p class="sub">Designed for messy OCR text: blank lines separate records, number-only OCR lines are removed, auth-style lines are recognized separately, and 2/3-line blocks are reconstructed without crossing record boundaries.</p>
 
-<div class="box" style="margin-bottom:16px"><b>Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is processed in chunks and the output is written to browser storage before download.<div class="row"><input id="fileInput" type="file" accept=".txt,text/plain"><input id="keepKeyword" type="text" placeholder="Keep only lines containing (optional)"><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" style="display:none;color:#60a5fa;font-weight:bold" download="formatted.txt">Download formatted.txt</a></div><div class="grid">
+<div class="box" style="margin-bottom:16px"><b>
+Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is processed in chunks and the output is written to browser storage before download.<div class="row"><input id="fileInput" type="file" accept=".txt,text/plain"><input id="keepKeyword" type="text" placeholder="Keep only lines containing (optional)"><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" style="display:none;color:#60a5fa;font-weight:bold" download="formatted.txt">Download formatted.txt</a></div><div class="grid">
 <div class="card">
 <label for="input">Input</label>
 <textarea id="input" spellcheck="false" placeholder="Paste OCR text here..."></textarea>
@@ -38,6 +42,7 @@ code{word-break:break-all}
 <label class="check"><input id="authLines" type="checkbox" checked> Format auth/password/secret lines</label>
 <label class="check"><input id="threeLines" type="checkbox" checked> 3-line blocks → A:B:C</label>
 <label class="check"><input id="twoLines" type="checkbox" checked> 2-line blocks → A:B</label>
+<label class="check"><input id="stripFirstField" type="checkbox"> Remove first field (url:gmail:pass → gmail:pass)</label>
 <label class="check"><input id="blank" type="checkbox" checked> Remove blank lines from output</label>
 </div>
 
@@ -67,7 +72,7 @@ Both become <code>USER:PASS:SECRET</code>.
 <br><br>
 <b>Record rule</b><br>
 Blank lines are boundaries. A block containing 3 meaningful non-number lines becomes <code>A:B:C</code>.
-A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line.
+A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line. The optional first-field rule follows the exact Notepad++ pattern.
 </div>
 </div>
 
@@ -205,6 +210,23 @@ function processBlock(rawLines, options) {
           A line already containing ":" is considered a finished record.
           Do not merge it with surrounding OCR lines.
         */
+        /*
+          Optional Notepad++ rule:
+          Find:    ^.*:(.*:.*)$
+          Replace: $1
+
+          Therefore:
+            url:gmail:pass -> gmail:pass
+            a:b:c:d        -> b:c:d
+            a:b            -> unchanged
+        */
+        if (options.stripFirstField) {
+            const firstFieldMatch = line.match(/^.*:(.*:.*)$/);
+            if (firstFieldMatch) {
+                line = firstFieldMatch[1];
+            }
+        }
+
         if (line.includes(":")) {
             flushRawBuffer();
             result.push(line);
@@ -224,7 +246,8 @@ function processText() {
         removeNumbers: document.getElementById("removeNumbers").checked,
         authLines: document.getElementById("authLines").checked,
         threeLines: document.getElementById("threeLines").checked,
-        twoLines: document.getElementById("twoLines").checked
+        twoLines: document.getElementById("twoLines").checked,
+        stripFirstField: document.getElementById("stripFirstField").checked
     };
 
     const text = normalizeNewlines(input.value);
@@ -473,6 +496,20 @@ self.onmessage = function(event) {
                 continue;
             }
 
+            /*
+              Optional first-field removal:
+              url:gmail:pass -> gmail:pass
+              Equivalent to:
+              ^.*:(.*:.*)$
+              -> $1
+            */
+            if (options.stripFirstField) {
+                const firstFieldMatch = line.match(/^.*:(.*:.*)$/);
+                if (firstFieldMatch) {
+                    line = firstFieldMatch[1].trim();
+                }
+            }
+
             if (line.indexOf(":") !== -1) {
                 flushRaw();
                 output.push(line);
@@ -529,6 +566,7 @@ function getV14Options() {
         authLines: document.getElementById("authLines").checked,
         threeLines: document.getElementById("threeLines").checked,
         twoLines: document.getElementById("twoLines").checked,
+        stripFirstField: document.getElementById("stripFirstField").checked,
         keyword: (keepKeywordInput ? keepKeywordInput.value : "").trim(),
         caseSensitive: keepCaseInput ? keepCaseInput.checked : false
     };
