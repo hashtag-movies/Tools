@@ -43,6 +43,7 @@ Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is pro
 <label class="check"><input id="threeLines" type="checkbox" checked> 3-line blocks → A:B:C</label>
 <label class="check"><input id="twoLines" type="checkbox" checked> 2-line blocks → A:B</label>
 <label class="check"><input id="stripFirstField" type="checkbox"> Remove first field (url:gmail:pass → gmail:pass)</label>
+<label class="check"><input id="removePunctuation" type="checkbox" checked> Remove ! ? - from lines</label>
 <label class="check"><input id="blank" type="checkbox" checked> Remove blank lines from output</label>
 </div>
 
@@ -118,8 +119,7 @@ function removeTxnSuffix(line) {
 }
 
 /*
-  Always remove !, ? and - wherever they occur in a line.
-  This is intentionally always enabled and has no on/off button.
+  Optionally remove !, ? and - wherever they occur in a line.
 */
 function removeLinePunctuation(line) {
     return line.replace(/[!?\-]/g, "");
@@ -191,7 +191,9 @@ function processBlock(rawLines, options) {
     for (let line of lines) {
         // Always-on cleanup requested by the user.
         line = removeTxnSuffix(line);
-        line = removeLinePunctuation(line);
+        if (options.removePunctuation) {
+            line = removeLinePunctuation(line);
+        }
         line = line.trim();
 
         if (!line) continue;
@@ -247,7 +249,8 @@ function processText() {
         authLines: document.getElementById("authLines").checked,
         threeLines: document.getElementById("threeLines").checked,
         twoLines: document.getElementById("twoLines").checked,
-        stripFirstField: document.getElementById("stripFirstField").checked
+        stripFirstField: document.getElementById("stripFirstField").checked,
+        removePunctuation: document.getElementById("removePunctuation").checked
     };
 
     const text = normalizeNewlines(input.value);
@@ -468,7 +471,10 @@ self.onmessage = function(event) {
 
         for (let line of lines) {
             line = removeTxn(line);
-            line = removePunctuation(line).trim();
+            if (options.removePunctuation) {
+                line = removePunctuation(line);
+            }
+            line = line.trim();
 
             if (!line) continue;
 
@@ -567,6 +573,7 @@ function getV14Options() {
         threeLines: document.getElementById("threeLines").checked,
         twoLines: document.getElementById("twoLines").checked,
         stripFirstField: document.getElementById("stripFirstField").checked,
+        removePunctuation: document.getElementById("removePunctuation").checked,
         keyword: (keepKeywordInput ? keepKeywordInput.value : "").trim(),
         caseSensitive: keepCaseInput ? keepCaseInput.checked : false
     };
