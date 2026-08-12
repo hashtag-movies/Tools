@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OCR Credential Record Formatter V9</title>
-    <link rel="icon" type="image/png" href="icon.png">
 <style>
 body{margin:0;background:#101216;color:#eee;font:14px Arial,sans-serif}
 .wrap{max-width:1250px;margin:auto;padding:22px}
@@ -28,7 +27,7 @@ code{word-break:break-all}
 <h1>OCR Record Formatter V9</h1>
 <p class="sub">Designed for messy OCR text: blank lines separate records, number-only OCR lines are removed, auth-style lines are recognized separately, and 2/3-line blocks are reconstructed without crossing record boundaries.</p>
 
-<div class="grid">
+<div class="box" style="margin-bottom:16px"><b>Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is processed locally in chunks and the result is provided as a TXT download.<div class="row"><input id="fileInput" type="file" accept=".txt,text/plain"><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" style="display:none;color:#60a5fa;font-weight:bold" download="formatted.txt">Download formatted.txt</a></div><div class="grid">
 <div class="card">
 <label for="input">Input</label>
 <textarea id="input" spellcheck="false" placeholder="Paste OCR text here..."></textarea>
@@ -131,21 +130,14 @@ function removeLinePunctuation(line) {
   The latter is important because OCR can drop "auth login:".
 */
 function formatAuthLine(line) {
-    let m = line.match(
-        /^auth\s+login:\s*(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i
-    );
+    // Accept: auth login: ..., login: ..., or type: auth login: ...
+    // by looking for the login/password/secret sequence anywhere in the line.
+    let m = line.match(/\blogin:\s*(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i);
+    if (m) return m[1] + ":" + m[2] + ":" + m[3];
 
-    if (m) {
-        return m[1] + ":" + m[2] + ":" + m[3];
-    }
-
-    m = line.match(
-        /^(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i
-    );
-
-    if (m) {
-        return m[1] + ":" + m[2] + ":" + m[3];
-    }
+    // OCR can lose "login:" entirely.
+    m = line.match(/^(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i);
+    if (m) return m[1] + ":" + m[2] + ":" + m[3];
 
     return null;
 }
@@ -364,6 +356,92 @@ auth login: PHTn5bco password: ORm1JpYLQU secret: Yal332vTM720J4mJ`;
 
     processText();
 });
+
+/* LARGE_FILE_MODE_V11 */
+const fileInput=document.getElementById("fileInput");
+const processFileButton=document.getElementById("processFile");
+const cancelFileButton=document.getElementById("cancelFile");
+const fileStatus=document.getElementById("fileStatus");
+const progress=document.getElementById("progress");
+const downloadFile=document.getElementById("downloadFile");
+let fileWorker=null,fileCancelled=false;
+
+const workerSource=`
+self.onmessage=function(e){
+ const o=e.data.options;
+ const lines=e.data.text.replace(/\\r\\n?/g,"\\n").split("\\n");
+ const out=[]; let block=[];
+ function auth(s){
+  let m=s.match(/\\blogin:\\s*(\\S+)\\s+password:\\s*(\\S+)\\s+secret:\\s*(\\S+)\\s*$/i);
+  if(m)return m[1]+":"+m[2]+":"+m[3];
+  m=s.match(/^(\\S+)\\s+password:\\s*(\\S+)\\s+secret:\\s*(\\S+)\\s*$/i);
+  return m?m[1]+":"+m[2]+":"+m[3]:null;
+ }
+ function flush(){
+  if(!block.length)return;
+  let a=block.map(x=>x.trim()).filter(Boolean);
+  if(o.removeNumbers)a=a.filter(x=>!/^[ \\t]*\\d+(?:\\.\\d+)?[ \\t]*$/.test(x));
+  let raw=[];
+  function fr(){
+   if(raw.length===3&&o.three)out.push(raw[0]+":"+raw[1]+":"+raw[2]);
+   else if(raw.length===2&&o.two)out.push(raw[0]+":"+raw[1]);
+   else out.push(...raw);
+   raw=[];
+  }
+  for(let s of a){
+   s=s.replace(/\\s+\\d+(?:\\.\\d+)?\\s+txn\\s+\\d+\\s*$/i,"").replace(/[!?\\-]/g,"").trim();
+   if(!s)continue;
+   let z=o.auth?auth(s):null;
+   if(z!==null){fr();out.push(z);continue;}
+   if(s.includes(":")){fr();out.push(s);}else raw.push(s);
+  }
+  fr(); block=[];
+ }
+ for(const l of lines){if(/^[ \\t]*$/.test(l))flush();else block.push(l);}
+ if(e.data.finalChunk)flush();
+ self.postMessage({done:e.data.finalChunk,out:out.join("\\n")});
+};
+`;
+
+async function processLargeTXT(){
+ if(!fileInput.files.length){fileStatus.textContent="Please select a TXT file.";return;}
+ const file=fileInput.files[0],CHUNK=4*1024*1024;
+ fileCancelled=false;
+ if(fileWorker)fileWorker.terminate();
+ fileWorker=new Worker(URL.createObjectURL(new Blob([workerSource],{type:"application/javascript"})));
+ processFileButton.disabled=true;cancelFileButton.disabled=false;progress.style.display="block";progress.value=0;downloadFile.style.display="none";
+ let offset=0,carry="",parts=[];
+ const decoder=new TextDecoder();
+ const options=()=>({removeNumbers:document.getElementById("removeNumbers").checked,auth:document.getElementById("authLines").checked,three:document.getElementById("threeLines").checked,two:document.getElementById("twoLines").checked});
+ async function send(){
+  if(offset>=file.size){
+   fileWorker.postMessage({text:carry,finalChunk:true,options:options()});return;
+  }
+  const end=Math.min(offset+CHUNK,file.size);
+  const text=carry+decoder.decode(await file.slice(offset,end).arrayBuffer(),{stream:end<file.size});
+  offset=end;
+  const cut=text.lastIndexOf("\\n");
+  const complete=cut>=0?text.slice(0,cut+1):"";
+  carry=cut>=0?text.slice(cut+1):text;
+  fileWorker.postMessage({text:complete,finalChunk:end>=file.size,options:options()});
+  progress.value=offset/file.size*100;
+  fileStatus.textContent="Processing "+file.name+" — "+progress.value.toFixed(1)+"%";
+ }
+ fileWorker.onmessage=async e=>{
+  if(fileCancelled)return;
+  if(e.data.out)parts.push(e.data.out+"\\n");
+  if(e.data.done){
+   const blob=new Blob(parts,{type:"text/plain;charset=utf-8"});
+   downloadFile.href=URL.createObjectURL(blob);downloadFile.style.display="inline-block";
+   fileStatus.textContent="Completed: "+file.name;
+   processFileButton.disabled=false;cancelFileButton.disabled=true;progress.value=100;
+   fileWorker.terminate();fileWorker=null;
+  }else await send();
+ };
+ await send();
+}
+processFileButton.addEventListener("click",processLargeTXT);
+cancelFileButton.addEventListener("click",()=>{fileCancelled=true;if(fileWorker)fileWorker.terminate();fileWorker=null;processFileButton.disabled=false;cancelFileButton.disabled=true;progress.style.display="none";fileStatus.textContent="Cancelled.";});
 
 processText();
 </script>
