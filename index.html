@@ -27,7 +27,7 @@ code{word-break:break-all}
 <h1>OCR Record Formatter V9</h1>
 <p class="sub">Designed for messy OCR text: blank lines separate records, number-only OCR lines are removed, auth-style lines are recognized separately, and 2/3-line blocks are reconstructed without crossing record boundaries.</p>
 
-<div class="box" style="margin-bottom:16px"><b>Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is processed locally in chunks and the result is provided as a TXT download.<div class="row"><input id="fileInput" type="file" accept=".txt,text/plain"><input id="keepKeyword" type="text" placeholder="Keep only lines containing..."><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" style="display:none;color:#60a5fa;font-weight:bold" download="formatted.txt">Download formatted.txt</a></div><div class="grid">
+<div class="box" style="margin-bottom:16px"><b>Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is processed in chunks and the output is written to browser storage before download.<div class="row"><input id="fileInput" type="file" accept=".txt,text/plain"><input id="keepKeyword" type="text" placeholder="Keep only lines containing (optional)"><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" style="display:none;color:#60a5fa;font-weight:bold" download="formatted.txt">Download formatted.txt</a></div><div class="grid">
 <div class="card">
 <label for="input">Input</label>
 <textarea id="input" spellcheck="false" placeholder="Paste OCR text here..."></textarea>
@@ -357,193 +357,503 @@ auth login: PHTn5bco password: ORm1JpYLQU secret: Yal332vTM720J4mJ`;
     processText();
 });
 
-/* LARGE_FILE_MODE_V12 */
-const fileInput=document.getElementById("fileInput");
-const processFileButton=document.getElementById("processFile");
-const cancelFileButton=document.getElementById("cancelFile");
-const fileStatus=document.getElementById("fileStatus");
-const progress=document.getElementById("progress");
-const downloadFile=document.getElementById("downloadFile");
-const keepKeywordInput=document.getElementById("keepKeyword");
-const keepCaseInput=document.getElementById("keepCase");
+/* LARGE_FILE_MODE_V14
+   Cross-origin-safe large-file output:
+   - Does NOT call showSaveFilePicker (blocked in ChatGPT/iframe previews).
+   - Writes output to the browser's Origin Private File System (OPFS).
+   - Creates a download link from the completed disk-backed File.
+   - Falls back to a Blob only if OPFS is unavailable.
+*/
+const fileInput = document.getElementById("fileInput");
+const processFileButton = document.getElementById("processFile");
+const cancelFileButton = document.getElementById("cancelFile");
+const fileStatus = document.getElementById("fileStatus");
+const progress = document.getElementById("progress");
+const downloadFile = document.getElementById("downloadFile");
+const keepKeywordInput = document.getElementById("keepKeyword");
+const keepCaseInput = document.getElementById("keepCase");
 
-let fileWorker=null,fileCancelled=false;
+let fileWorker = null;
+let fileCancelled = false;
+let opfsWritable = null;
+let opfsFileHandle = null;
+let fallbackParts = [];
 
-const workerSource=`
-self.onmessage=function(e){
- const d=e.data,o=d.options;
- let block=[];
+const WORKER_CODE_V14 = String.raw`
+self.onmessage = function(event) {
+    const data = event.data;
+    const options = data.options;
+    let currentBlock = [];
 
- function auth(s){
-  let m=s.match(/\\\\blogin:\\\\s*(\\\\S+)\\\\s+password:\\\\s*(\\\\S+)\\\\s+secret:\\\\s*(\\\\S+)\\\\s*$/i);
-  if(m)return m[1]+":"+m[2]+":"+m[3];
-  m=s.match(/^(\\\\S+)\\\\s+password:\\\\s*(\\\\S+)\\\\s+secret:\\\\s*(\\\\S+)\\\\s*$/i);
-  return m?m[1]+":"+m[2]+":"+m[3]:null;
- }
- function clean(s){
-  return s.replace(/\\\\s+\\\\d+(?:\\\\.\\\\d+)?\\\\s+txn\\\\s+\\\\d+\\\\s*$/i,"")
-          .replace(/[!?\\\\-]/g,"").trim();
- }
- function flush(){
-  if(!block.length)return "";
-  let a=block.map(x=>x.trim()).filter(Boolean);
-  if(o.removeNumbers)a=a.filter(x=>!/^[ \\\\t]*\\\\d+(?:\\\\.\\\\d+)?[ \\\\t]*$/.test(x));
+    function isNumberOnly(line) {
+        return /^[ \t]*\d+(?:\.\d+)?[ \t]*$/.test(line);
+    }
 
-  // Keyword filtering is line-based and is applied before reconstruction.
-  if(o.keyword){
-   const needle=o.caseSensitive?o.keyword:o.keyword.toLowerCase();
-   a=a.filter(x=>{
-    const s=o.caseSensitive?x:x.toLowerCase();
-    return s.includes(needle);
-   });
-  }
+    function removeTxn(line) {
+        return line.replace(/\s+\d+(?:\.\d+)?\s+txn\s+\d+\s*$/i, "");
+    }
 
-  const out=[],raw=[];
-  function fr(){
-   if(!raw.length)return;
-   if(raw.length===3&&o.three)out.push(raw[0]+":"+raw[1]+":"+raw[2]);
-   else if(raw.length===2&&o.two)out.push(raw[0]+":"+raw[1]);
-   else out.push(...raw);
-   raw.length=0;
-  }
+    function removePunctuation(line) {
+        return line.replace(/[!?-]/g, "");
+    }
 
-  for(let s of a){
-   s=clean(s);
-   if(!s)continue;
-   const z=o.auth?auth(s):null;
-   if(z!==null){fr();out.push(z);continue;}
-   if(s.includes(":")){fr();out.push(s);}
-   else raw.push(s);
-  }
-  fr(); block=[];
-  return out.join("\\n");
- }
+    function formatAuth(line) {
+        let m = line.match(
+            /\blogin:\s*(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i
+        );
+        if (m) return m[1] + ":" + m[2] + ":" + m[3];
 
- const lines=d.text.replace(/\\r\\n?/g,"\\n").split("\\n");
- const out=[];
- for(const line of lines){
-  if(/^[ \\\\t]*$/.test(line)){
-   const r=flush(); if(r)out.push(r);
-  }else block.push(line);
- }
- if(d.finalChunk){
-  const r=flush(); if(r)out.push(r);
- }
- self.postMessage({done:!!d.finalChunk,output:out.join("\\n")});
+        m = line.match(
+            /^(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i
+        );
+        if (m) return m[1] + ":" + m[2] + ":" + m[3];
+
+        return null;
+    }
+
+    function flushBlock() {
+        if (!currentBlock.length) return "";
+
+        let lines = currentBlock
+            .map(function(x) { return x.trim(); })
+            .filter(Boolean);
+
+        currentBlock = [];
+
+        if (options.removeNumbers) {
+            lines = lines.filter(function(x) {
+                return !isNumberOnly(x);
+            });
+        }
+
+        const output = [];
+        let raw = [];
+
+        function flushRaw() {
+            if (!raw.length) return;
+
+            if (raw.length === 3 && options.threeLines) {
+                output.push(raw[0] + ":" + raw[1] + ":" + raw[2]);
+            } else if (raw.length === 2 && options.twoLines) {
+                output.push(raw[0] + ":" + raw[1]);
+            } else {
+                output.push.apply(output, raw);
+            }
+
+            raw = [];
+        }
+
+        for (let line of lines) {
+            line = removeTxn(line);
+            line = removePunctuation(line).trim();
+
+            if (!line) continue;
+
+            /*
+              Keep-only filter.
+              Empty keyword = disabled.
+            */
+            if (options.keyword) {
+                const haystack = options.caseSensitive
+                    ? line
+                    : line.toLowerCase();
+
+                const needle = options.caseSensitive
+                    ? options.keyword
+                    : options.keyword.toLowerCase();
+
+                if (haystack.indexOf(needle) === -1) continue;
+            }
+
+            const auth = options.authLines ? formatAuth(line) : null;
+
+            if (auth !== null) {
+                flushRaw();
+                output.push(auth);
+                continue;
+            }
+
+            if (line.indexOf(":") !== -1) {
+                flushRaw();
+                output.push(line);
+            } else {
+                raw.push(line);
+            }
+        }
+
+        flushRaw();
+        return output.join("\n");
+    }
+
+    try {
+        const lines = data.text.replace(/\r\n?/g, "\n").split("\n");
+        const results = [];
+
+        for (const line of lines) {
+            if (/^[ \t]*$/.test(line)) {
+                const result = flushBlock();
+                if (result) results.push(result);
+            } else {
+                currentBlock.push(line);
+            }
+        }
+
+        if (data.finalChunk) {
+            const result = flushBlock();
+            if (result) results.push(result);
+        }
+
+        self.postMessage({
+            type: "result",
+            finalChunk: data.finalChunk,
+            text: results.join("\n")
+        });
+    } catch (error) {
+        self.postMessage({
+            type: "error",
+            message: error && error.stack ? error.stack : String(error)
+        });
+    }
 };
 `;
 
-function newWorker(){
- return new Worker(URL.createObjectURL(new Blob([workerSource],{type:"application/javascript"})));
-}
-function opts(){
- return {
-  removeNumbers:document.getElementById("removeNumbers").checked,
-  auth:document.getElementById("authLines").checked,
-  three:document.getElementById("threeLines").checked,
-  two:document.getElementById("twoLines").checked,
-  keyword:(keepKeywordInput?.value||"").trim(),
-  caseSensitive:!!keepCaseInput?.checked
- };
+function createV14Worker() {
+    return new Worker(URL.createObjectURL(
+        new Blob([WORKER_CODE_V14], {type: "application/javascript"})
+    ));
 }
 
-async function processLargeTXT(){
- if(!fileInput.files.length){fileStatus.textContent="Please select a TXT file.";return;}
-
- const file=fileInput.files[0], CHUNK=4*1024*1024;
- fileCancelled=false;
- if(fileWorker)fileWorker.terminate();
- fileWorker=newWorker();
-
- processFileButton.disabled=true;
- cancelFileButton.disabled=false;
- progress.style.display="block";
- progress.value=0;
- downloadFile.style.display="none";
-
- let writable=null, fallback=[];
- try{
-  if(window.showSaveFilePicker){
-   const handle=await window.showSaveFilePicker({
-    suggestedName:"formatted.txt",
-    types:[{description:"Text file",accept:{"text/plain":[".txt"]}}]
-   });
-   writable=await handle.createWritable();
-  }
- }catch(err){
-  if(err.name==="AbortError"){
-   fileWorker.terminate();fileWorker=null;
-   processFileButton.disabled=false;cancelFileButton.disabled=true;
-   progress.style.display="none";fileStatus.textContent="Save cancelled.";return;
-  }
- }
-
- let offset=0,carry="",records=0;
- const decoder=new TextDecoder();
-
- function status(){
-  const pct=file.size?(offset/file.size*100):100;
-  progress.value=pct;
-  fileStatus.textContent="Processing "+file.name+" — "+pct.toFixed(1)+"%";
- }
-
- async function send(){
-  if(fileCancelled)return;
-  if(offset>=file.size){
-   fileWorker.postMessage({text:carry,finalChunk:true,options:opts()});
-   carry="";return;
-  }
-  const end=Math.min(offset+CHUNK,file.size);
-  const text=carry+decoder.decode(await file.slice(offset,end).arrayBuffer(),{stream:end<file.size});
-  offset=end;
-  const cut=text.lastIndexOf("\\n");
-  const complete=cut>=0?text.slice(0,cut+1):"";
-  carry=cut>=0?text.slice(cut+1):text;
-  fileWorker.postMessage({text:complete,finalChunk:false,options:opts()});
-  status();
- }
-
- fileWorker.onmessage=async e=>{
-  if(fileCancelled)return;
-  if(e.data.output){
-   records+=e.data.output.split("\\n").length;
-   const text=e.data.output+"\\n";
-   if(writable)await writable.write(text); else fallback.push(text);
-  }
-  if(e.data.done){
-   if(writable){
-    await writable.close();
-    fileStatus.textContent="Completed — output saved. Records: "+records.toLocaleString();
-   }else{
-    const blob=new Blob(fallback,{type:"text/plain;charset=utf-8"});
-    downloadFile.href=URL.createObjectURL(blob);
-    downloadFile.style.display="inline-block";
-    downloadFile.textContent="Download formatted.txt";
-    fileStatus.textContent="Completed — click Download formatted.txt. Records: "+records.toLocaleString();
-   }
-   progress.value=100;
-   processFileButton.disabled=false;cancelFileButton.disabled=true;
-   fileWorker.terminate();fileWorker=null;return;
-  }
-  await send();
- };
-
- try{await send();}
- catch(err){
-  try{if(writable)await writable.abort();}catch(_){}
-  if(fileWorker)fileWorker.terminate();
-  fileWorker=null;processFileButton.disabled=false;cancelFileButton.disabled=true;
-  fileStatus.textContent="Error: "+err.message;
- }
+function getV14Options() {
+    return {
+        removeNumbers: document.getElementById("removeNumbers").checked,
+        authLines: document.getElementById("authLines").checked,
+        threeLines: document.getElementById("threeLines").checked,
+        twoLines: document.getElementById("twoLines").checked,
+        keyword: (keepKeywordInput ? keepKeywordInput.value : "").trim(),
+        caseSensitive: keepCaseInput ? keepCaseInput.checked : false
+    };
 }
 
-processFileButton.addEventListener("click",processLargeTXT);
-cancelFileButton.addEventListener("click",()=>{
- fileCancelled=true;
- if(fileWorker)fileWorker.terminate();
- fileWorker=null;
- processFileButton.disabled=false;cancelFileButton.disabled=true;
- progress.style.display="none";fileStatus.textContent="Cancelled.";
+async function openV14Output() {
+    /*
+      OPFS is available in modern Chromium browsers even when the page is
+      embedded in a cross-origin iframe. This avoids showSaveFilePicker,
+      which is exactly what failed in the screenshot.
+    */
+    if (!navigator.storage || !navigator.storage.getDirectory) {
+        return false;
+    }
+
+    const root = await navigator.storage.getDirectory();
+
+    const filename =
+        "formatted_" +
+        Date.now() +
+        ".txt";
+
+    opfsFileHandle = await root.getFileHandle(filename, {create: true});
+    opfsWritable = await opfsFileHandle.createWritable();
+
+    return true;
+}
+
+async function finishV14Output() {
+    if (opfsWritable) {
+        await opfsWritable.close();
+        opfsWritable = null;
+
+        const file = await opfsFileHandle.getFile();
+
+        if (downloadFile.dataset.objectUrl) {
+            URL.revokeObjectURL(downloadFile.dataset.objectUrl);
+        }
+
+        const url = URL.createObjectURL(file);
+
+        downloadFile.href = url;
+        downloadFile.dataset.objectUrl = url;
+        downloadFile.download = "formatted.txt";
+        downloadFile.textContent =
+            "Download formatted.txt (" +
+            (file.size / 1048576).toFixed(1) +
+            " MB)";
+        downloadFile.style.display = "inline-block";
+
+        return file.size;
+    }
+
+    const blob = new Blob(fallbackParts, {
+        type: "text/plain;charset=utf-8"
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    downloadFile.href = url;
+    downloadFile.download = "formatted.txt";
+    downloadFile.textContent = "Download formatted.txt";
+    downloadFile.style.display = "inline-block";
+
+    fallbackParts = [];
+
+    return blob.size;
+}
+
+async function processLargeTXT() {
+    if (!fileInput.files || !fileInput.files.length) {
+        fileStatus.textContent = "Please select a TXT file first.";
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const CHUNK_SIZE = 4 * 1024 * 1024;
+
+    fileCancelled = false;
+    fallbackParts = [];
+    opfsWritable = null;
+    opfsFileHandle = null;
+
+    if (fileWorker) fileWorker.terminate();
+    fileWorker = createV14Worker();
+
+    processFileButton.disabled = true;
+    cancelFileButton.disabled = false;
+    progress.style.display = "block";
+    progress.value = 0;
+    downloadFile.style.display = "none";
+
+    /*
+      First try OPFS. This is the fix for the error shown in the screenshot:
+      we never call window.showSaveFilePicker inside the embedded page.
+    */
+    let usingOPFS = false;
+
+    try {
+        usingOPFS = await openV14Output();
+    } catch (_) {
+        usingOPFS = false;
+    }
+
+    if (!usingOPFS) {
+        /*
+          Last-resort fallback. This is suitable for smaller files.
+          For very large files, the UI warns the user.
+        */
+        if (file.size > 200 * 1024 * 1024) {
+            fileWorker.terminate();
+            fileWorker = null;
+            processFileButton.disabled = false;
+            cancelFileButton.disabled = true;
+            progress.style.display = "none";
+
+            fileStatus.textContent =
+                "This browser does not provide OPFS in this page. " +
+                "For files over 200 MB, open the HTML directly in Chrome/Edge " +
+                "instead of the embedded preview.";
+            return;
+        }
+    }
+
+    let offset = 0;
+    let carry = "";
+    let records = 0;
+    let waiting = false;
+
+    const decoder = new TextDecoder("utf-8");
+
+    function updateProgress() {
+        const percent = file.size
+            ? Math.min(100, offset / file.size * 100)
+            : 100;
+
+        progress.value = percent;
+
+        const keyword =
+            (keepKeywordInput ? keepKeywordInput.value.trim() : "");
+
+        fileStatus.textContent =
+            "Processing " + file.name +
+            " — " + percent.toFixed(1) + "%" +
+            (keyword ? " — keeping lines containing: " + keyword : "");
+    }
+
+    async function sendNext() {
+        if (fileCancelled || waiting) return;
+
+        if (offset >= file.size) {
+            waiting = true;
+
+            fileWorker.postMessage({
+                text: carry,
+                finalChunk: true,
+                options: getV14Options()
+            });
+
+            carry = "";
+            return;
+        }
+
+        const end = Math.min(offset + CHUNK_SIZE, file.size);
+
+        const buffer = await file
+            .slice(offset, end)
+            .arrayBuffer();
+
+        const decoded = decoder.decode(
+            buffer,
+            {stream: end < file.size}
+        );
+
+        offset = end;
+
+        const combined = carry + decoded;
+        const lastNewline = combined.lastIndexOf("\n");
+
+        if (lastNewline < 0) {
+            carry = combined;
+            updateProgress();
+            await sendNext();
+            return;
+        }
+
+        const completeText =
+            combined.slice(0, lastNewline + 1);
+
+        carry =
+            combined.slice(lastNewline + 1);
+
+        waiting = true;
+
+        fileWorker.postMessage({
+            text: completeText,
+            finalChunk: false,
+            options: getV14Options()
+        });
+
+        updateProgress();
+    }
+
+    fileWorker.onerror = async function(error) {
+        fileCancelled = true;
+
+        try {
+            if (opfsWritable) await opfsWritable.abort();
+        } catch (_) {}
+
+        if (fileWorker) fileWorker.terminate();
+        fileWorker = null;
+
+        processFileButton.disabled = false;
+        cancelFileButton.disabled = true;
+
+        fileStatus.textContent =
+            "Worker error: " +
+            (error.message || "unknown error");
+    };
+
+    fileWorker.onmessage = async function(event) {
+        if (fileCancelled) return;
+
+        if (event.data.type === "error") {
+            fileCancelled = true;
+
+            try {
+                if (opfsWritable) await opfsWritable.abort();
+            } catch (_) {}
+
+            fileWorker.terminate();
+            fileWorker = null;
+
+            processFileButton.disabled = false;
+            cancelFileButton.disabled = true;
+
+            fileStatus.textContent =
+                "Processing error: " + event.data.message;
+            return;
+        }
+
+        if (event.data.type !== "result") return;
+
+        waiting = false;
+
+        if (event.data.text) {
+            const outputText = event.data.text + "\n";
+
+            if (opfsWritable) {
+                await opfsWritable.write(outputText);
+            } else {
+                fallbackParts.push(outputText);
+            }
+
+            records += event.data.text.split("\n").length;
+        }
+
+        if (event.data.finalChunk) {
+            try {
+                const outputSize = await finishV14Output();
+
+                progress.value = 100;
+
+                fileStatus.textContent =
+                    "✓ Completed — " +
+                    (outputSize / 1048576).toFixed(1) +
+                    " MB output — " +
+                    records.toLocaleString() +
+                    " records.";
+            } catch (error) {
+                fileStatus.textContent =
+                    "Could not create output: " +
+                    error.message;
+            }
+
+            processFileButton.disabled = false;
+            cancelFileButton.disabled = true;
+
+            fileWorker.terminate();
+            fileWorker = null;
+            return;
+        }
+
+        await sendNext();
+    };
+
+    try {
+        await sendNext();
+    } catch (error) {
+        try {
+            if (opfsWritable) await opfsWritable.abort();
+        } catch (_) {}
+
+        if (fileWorker) fileWorker.terminate();
+        fileWorker = null;
+
+        processFileButton.disabled = false;
+        cancelFileButton.disabled = true;
+
+        fileStatus.textContent =
+            "Error: " + error.message;
+    }
+}
+
+processFileButton.addEventListener("click", processLargeTXT);
+
+cancelFileButton.addEventListener("click", async function() {
+    fileCancelled = true;
+
+    if (fileWorker) {
+        fileWorker.terminate();
+        fileWorker = null;
+    }
+
+    try {
+        if (opfsWritable) await opfsWritable.abort();
+    } catch (_) {}
+
+    opfsWritable = null;
+
+    processFileButton.disabled = false;
+    cancelFileButton.disabled = true;
+    progress.style.display = "none";
+    fileStatus.textContent = "Cancelled.";
 });
 
 processText();
