@@ -21,13 +21,13 @@ button.secondary{background:#4b5563}.danger{background:#b42318}
 code{word-break:break-all}
 @media(max-width:850px){.grid{grid-template-columns:1fr}textarea{height:430px}}
 </style>
-</head>
+<style>#keepKeyword{padding:9px;border-radius:8px;border:1px solid #3b4350;background:#080a0e;color:#eee;min-width:260px}</style></head>
 <body>
 <div class="wrap">
 <h1>OCR Record Formatter V9</h1>
 <p class="sub">Designed for messy OCR text: blank lines separate records, number-only OCR lines are removed, auth-style lines are recognized separately, and 2/3-line blocks are reconstructed without crossing record boundaries.</p>
 
-<div class="box" style="margin-bottom:16px"><b>Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is processed locally in chunks and the result is provided as a TXT download.<div class="row"><input id="fileInput" type="file" accept=".txt,text/plain"><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" style="display:none;color:#60a5fa;font-weight:bold" download="formatted.txt">Download formatted.txt</a></div><div class="grid">
+<div class="box" style="margin-bottom:16px"><b>Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is processed locally in chunks and the result is provided as a TXT download.<div class="row"><input id="fileInput" type="file" accept=".txt,text/plain"><input id="keepKeyword" type="text" placeholder="Keep only lines containing..."><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" style="display:none;color:#60a5fa;font-weight:bold" download="formatted.txt">Download formatted.txt</a></div><div class="grid">
 <div class="card">
 <label for="input">Input</label>
 <textarea id="input" spellcheck="false" placeholder="Paste OCR text here..."></textarea>
@@ -357,65 +357,141 @@ auth login: PHTn5bco password: ORm1JpYLQU secret: Yal332vTM720J4mJ`;
     processText();
 });
 
-/* LARGE_FILE_MODE_V11 */
+/* LARGE_FILE_MODE_V12 */
 const fileInput=document.getElementById("fileInput");
 const processFileButton=document.getElementById("processFile");
 const cancelFileButton=document.getElementById("cancelFile");
 const fileStatus=document.getElementById("fileStatus");
 const progress=document.getElementById("progress");
 const downloadFile=document.getElementById("downloadFile");
+const keepKeywordInput=document.getElementById("keepKeyword");
+const keepCaseInput=document.getElementById("keepCase");
+
 let fileWorker=null,fileCancelled=false;
 
 const workerSource=`
 self.onmessage=function(e){
- const o=e.data.options;
- const lines=e.data.text.replace(/\\r\\n?/g,"\\n").split("\\n");
- const out=[]; let block=[];
+ const d=e.data,o=d.options;
+ let block=[];
+
  function auth(s){
-  let m=s.match(/\\blogin:\\s*(\\S+)\\s+password:\\s*(\\S+)\\s+secret:\\s*(\\S+)\\s*$/i);
+  let m=s.match(/\\\\blogin:\\\\s*(\\\\S+)\\\\s+password:\\\\s*(\\\\S+)\\\\s+secret:\\\\s*(\\\\S+)\\\\s*$/i);
   if(m)return m[1]+":"+m[2]+":"+m[3];
-  m=s.match(/^(\\S+)\\s+password:\\s*(\\S+)\\s+secret:\\s*(\\S+)\\s*$/i);
+  m=s.match(/^(\\\\S+)\\\\s+password:\\\\s*(\\\\S+)\\\\s+secret:\\\\s*(\\\\S+)\\\\s*$/i);
   return m?m[1]+":"+m[2]+":"+m[3]:null;
  }
+ function clean(s){
+  return s.replace(/\\\\s+\\\\d+(?:\\\\.\\\\d+)?\\\\s+txn\\\\s+\\\\d+\\\\s*$/i,"")
+          .replace(/[!?\\\\-]/g,"").trim();
+ }
  function flush(){
-  if(!block.length)return;
+  if(!block.length)return "";
   let a=block.map(x=>x.trim()).filter(Boolean);
-  if(o.removeNumbers)a=a.filter(x=>!/^[ \\t]*\\d+(?:\\.\\d+)?[ \\t]*$/.test(x));
-  let raw=[];
+  if(o.removeNumbers)a=a.filter(x=>!/^[ \\\\t]*\\\\d+(?:\\\\.\\\\d+)?[ \\\\t]*$/.test(x));
+
+  // Keyword filtering is line-based and is applied before reconstruction.
+  if(o.keyword){
+   const needle=o.caseSensitive?o.keyword:o.keyword.toLowerCase();
+   a=a.filter(x=>{
+    const s=o.caseSensitive?x:x.toLowerCase();
+    return s.includes(needle);
+   });
+  }
+
+  const out=[],raw=[];
   function fr(){
+   if(!raw.length)return;
    if(raw.length===3&&o.three)out.push(raw[0]+":"+raw[1]+":"+raw[2]);
    else if(raw.length===2&&o.two)out.push(raw[0]+":"+raw[1]);
    else out.push(...raw);
-   raw=[];
+   raw.length=0;
   }
+
   for(let s of a){
-   s=s.replace(/\\s+\\d+(?:\\.\\d+)?\\s+txn\\s+\\d+\\s*$/i,"").replace(/[!?\\-]/g,"").trim();
+   s=clean(s);
    if(!s)continue;
-   let z=o.auth?auth(s):null;
+   const z=o.auth?auth(s):null;
    if(z!==null){fr();out.push(z);continue;}
-   if(s.includes(":")){fr();out.push(s);}else raw.push(s);
+   if(s.includes(":")){fr();out.push(s);}
+   else raw.push(s);
   }
   fr(); block=[];
+  return out.join("\\n");
  }
- for(const l of lines){if(/^[ \\t]*$/.test(l))flush();else block.push(l);}
- if(e.data.finalChunk)flush();
- self.postMessage({done:e.data.finalChunk,out:out.join("\\n")});
+
+ const lines=d.text.replace(/\\r\\n?/g,"\\n").split("\\n");
+ const out=[];
+ for(const line of lines){
+  if(/^[ \\\\t]*$/.test(line)){
+   const r=flush(); if(r)out.push(r);
+  }else block.push(line);
+ }
+ if(d.finalChunk){
+  const r=flush(); if(r)out.push(r);
+ }
+ self.postMessage({done:!!d.finalChunk,output:out.join("\\n")});
 };
 `;
 
+function newWorker(){
+ return new Worker(URL.createObjectURL(new Blob([workerSource],{type:"application/javascript"})));
+}
+function opts(){
+ return {
+  removeNumbers:document.getElementById("removeNumbers").checked,
+  auth:document.getElementById("authLines").checked,
+  three:document.getElementById("threeLines").checked,
+  two:document.getElementById("twoLines").checked,
+  keyword:(keepKeywordInput?.value||"").trim(),
+  caseSensitive:!!keepCaseInput?.checked
+ };
+}
+
 async function processLargeTXT(){
  if(!fileInput.files.length){fileStatus.textContent="Please select a TXT file.";return;}
- const file=fileInput.files[0],CHUNK=4*1024*1024;
+
+ const file=fileInput.files[0], CHUNK=4*1024*1024;
  fileCancelled=false;
  if(fileWorker)fileWorker.terminate();
- fileWorker=new Worker(URL.createObjectURL(new Blob([workerSource],{type:"application/javascript"})));
- processFileButton.disabled=true;cancelFileButton.disabled=false;progress.style.display="block";progress.value=0;downloadFile.style.display="none";
- let offset=0,carry="",parts=[];
+ fileWorker=newWorker();
+
+ processFileButton.disabled=true;
+ cancelFileButton.disabled=false;
+ progress.style.display="block";
+ progress.value=0;
+ downloadFile.style.display="none";
+
+ let writable=null, fallback=[];
+ try{
+  if(window.showSaveFilePicker){
+   const handle=await window.showSaveFilePicker({
+    suggestedName:"formatted.txt",
+    types:[{description:"Text file",accept:{"text/plain":[".txt"]}}]
+   });
+   writable=await handle.createWritable();
+  }
+ }catch(err){
+  if(err.name==="AbortError"){
+   fileWorker.terminate();fileWorker=null;
+   processFileButton.disabled=false;cancelFileButton.disabled=true;
+   progress.style.display="none";fileStatus.textContent="Save cancelled.";return;
+  }
+ }
+
+ let offset=0,carry="",records=0;
  const decoder=new TextDecoder();
- const options=()=>({removeNumbers:document.getElementById("removeNumbers").checked,auth:document.getElementById("authLines").checked,three:document.getElementById("threeLines").checked,two:document.getElementById("twoLines").checked});
+
+ function status(){
+  const pct=file.size?(offset/file.size*100):100;
+  progress.value=pct;
+  fileStatus.textContent="Processing "+file.name+" — "+pct.toFixed(1)+"%";
+ }
+
  async function send(){
+  if(fileCancelled)return;
   if(offset>=file.size){
-   fileWorker.postMessage({text:carry,finalChunk:true,options:options()});return;
+   fileWorker.postMessage({text:carry,finalChunk:true,options:opts()});
+   carry="";return;
   }
   const end=Math.min(offset+CHUNK,file.size);
   const text=carry+decoder.decode(await file.slice(offset,end).arrayBuffer(),{stream:end<file.size});
@@ -423,25 +499,52 @@ async function processLargeTXT(){
   const cut=text.lastIndexOf("\\n");
   const complete=cut>=0?text.slice(0,cut+1):"";
   carry=cut>=0?text.slice(cut+1):text;
-  fileWorker.postMessage({text:complete,finalChunk:end>=file.size,options:options()});
-  progress.value=offset/file.size*100;
-  fileStatus.textContent="Processing "+file.name+" — "+progress.value.toFixed(1)+"%";
+  fileWorker.postMessage({text:complete,finalChunk:false,options:opts()});
+  status();
  }
+
  fileWorker.onmessage=async e=>{
   if(fileCancelled)return;
-  if(e.data.out)parts.push(e.data.out+"\\n");
+  if(e.data.output){
+   records+=e.data.output.split("\\n").length;
+   const text=e.data.output+"\\n";
+   if(writable)await writable.write(text); else fallback.push(text);
+  }
   if(e.data.done){
-   const blob=new Blob(parts,{type:"text/plain;charset=utf-8"});
-   downloadFile.href=URL.createObjectURL(blob);downloadFile.style.display="inline-block";
-   fileStatus.textContent="Completed: "+file.name;
-   processFileButton.disabled=false;cancelFileButton.disabled=true;progress.value=100;
-   fileWorker.terminate();fileWorker=null;
-  }else await send();
+   if(writable){
+    await writable.close();
+    fileStatus.textContent="Completed — output saved. Records: "+records.toLocaleString();
+   }else{
+    const blob=new Blob(fallback,{type:"text/plain;charset=utf-8"});
+    downloadFile.href=URL.createObjectURL(blob);
+    downloadFile.style.display="inline-block";
+    downloadFile.textContent="Download formatted.txt";
+    fileStatus.textContent="Completed — click Download formatted.txt. Records: "+records.toLocaleString();
+   }
+   progress.value=100;
+   processFileButton.disabled=false;cancelFileButton.disabled=true;
+   fileWorker.terminate();fileWorker=null;return;
+  }
+  await send();
  };
- await send();
+
+ try{await send();}
+ catch(err){
+  try{if(writable)await writable.abort();}catch(_){}
+  if(fileWorker)fileWorker.terminate();
+  fileWorker=null;processFileButton.disabled=false;cancelFileButton.disabled=true;
+  fileStatus.textContent="Error: "+err.message;
+ }
 }
+
 processFileButton.addEventListener("click",processLargeTXT);
-cancelFileButton.addEventListener("click",()=>{fileCancelled=true;if(fileWorker)fileWorker.terminate();fileWorker=null;processFileButton.disabled=false;cancelFileButton.disabled=true;progress.style.display="none";fileStatus.textContent="Cancelled.";});
+cancelFileButton.addEventListener("click",()=>{
+ fileCancelled=true;
+ if(fileWorker)fileWorker.terminate();
+ fileWorker=null;
+ processFileButton.disabled=false;cancelFileButton.disabled=true;
+ progress.style.display="none";fileStatus.textContent="Cancelled.";
+});
 
 processText();
 </script>
