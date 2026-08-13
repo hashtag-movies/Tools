@@ -44,6 +44,11 @@ Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is pro
 <label class="check"><input id="twoLines" type="checkbox" checked> 2-line blocks → A:B</label>
 <label class="check"><input id="stripFirstField" type="checkbox"> Remove first field (url:gmail:pass → gmail:pass)</label>
 <label class="check"><input id="removePunctuation" type="checkbox" checked> Remove ! ? - from lines</label>
+<label class="check"><input id="removeEmailSuffix" type="checkbox"> Remove @domain: part (abcd@___.___: → abcd:)</label>
+<label class="check"><input id="removeSymbolLines" type="checkbox"> Remove whole lines containing this symbol:
+<input id="lineRemoveSymbol" type="text" maxlength="10" placeholder="symbol" style="width:90px"></label>
+<label class="check">Remove this symbol only:
+<input id="singleRemoveSymbol" type="text" maxlength="1" placeholder="symbol" style="width:90px"></label>
 <label class="check"><input id="blank" type="checkbox" checked> Remove blank lines from output</label>
 </div>
 
@@ -71,6 +76,10 @@ Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is pro
 <code>USER password: PASS secret: SECRET</code><br>
 Both become <code>USER:PASS:SECRET</code>.
 <br><br>
+<b>Additional cleanup rules</b><br>
+<code>@[^:]+:\s*</code> → <code>:</code> (optional)<br>
+<code>\h*:\h*</code> → <code>:</code> (always on)<br>
+A selected symbol can remove an entire line (optional), or a separate field can remove only that exact symbol.<br><br>
 <b>Record rule</b><br>
 Blank lines are boundaries. A block containing 3 meaningful non-number lines becomes <code>A:B:C</code>.
 A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line. The optional first-field rule follows the exact Notepad++ pattern.
@@ -152,6 +161,21 @@ function formatAuthLine(line) {
   This is intentionally isolated so no record can consume data from
   the next record.
 */
+
+function removeEmailDomainPart(line) {
+    // User's Notepad++ rule:
+    // Find:    @[^:]+:\s*
+    // Replace: :
+    return line.replace(/@[^:]+:\s*/g, ":");
+}
+
+function normalizeColonSpacing(line) {
+    // User's Notepad++ rule:
+    // Find:    \h*:\h*
+    // Replace: :
+    return line.replace(/[ \t]*:[ \t]*/g, ":");
+}
+
 function processBlock(rawLines, options) {
     let lines = rawLines
         .map(cleanLine)
@@ -191,9 +215,32 @@ function processBlock(rawLines, options) {
     for (let line of lines) {
         // Always-on cleanup requested by the user.
         line = removeTxnSuffix(line);
+        line = line.trim();
+
+        // Optional: remove the entire line if it contains the selected symbol.
+        if (options.removeSymbolLines && options.lineRemoveSymbol) {
+            if (line.includes(options.lineRemoveSymbol)) {
+                continue;
+            }
+        }
+
+        // Optional: remove only the exact symbol entered by the user.
+        if (options.singleRemoveSymbol) {
+            line = line.split(options.singleRemoveSymbol).join("");
+        }
+
         if (options.removePunctuation) {
             line = removeLinePunctuation(line);
         }
+
+        // Always normalize spaces around ":".
+        line = normalizeColonSpacing(line);
+
+        // Optional: abcd@___.___: -> abcd:
+        if (options.removeEmailSuffix) {
+            line = removeEmailDomainPart(line);
+        }
+
         line = line.trim();
 
         if (!line) continue;
@@ -250,7 +297,11 @@ function processText() {
         threeLines: document.getElementById("threeLines").checked,
         twoLines: document.getElementById("twoLines").checked,
         stripFirstField: document.getElementById("stripFirstField").checked,
-        removePunctuation: document.getElementById("removePunctuation").checked
+        removePunctuation: document.getElementById("removePunctuation").checked,
+        removeEmailSuffix: document.getElementById("removeEmailSuffix").checked,
+        removeSymbolLines: document.getElementById("removeSymbolLines").checked,
+        lineRemoveSymbol: document.getElementById("lineRemoveSymbol").value,
+        singleRemoveSymbol: document.getElementById("singleRemoveSymbol").value
     };
 
     const text = normalizeNewlines(input.value);
@@ -423,6 +474,15 @@ self.onmessage = function(event) {
         return line.replace(/[!?-]/g, "");
     }
 
+
+    function removeEmailDomainPart(line) {
+        return line.replace(/@[^:]+:\s*/g, ":");
+    }
+
+    function normalizeColonSpacing(line) {
+        return line.replace(/[ \t]*:[ \t]*/g, ":");
+    }
+
     function formatAuth(line) {
         let m = line.match(
             /\blogin:\s*(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i
@@ -471,9 +531,28 @@ self.onmessage = function(event) {
 
         for (let line of lines) {
             line = removeTxn(line);
+            line = line.trim();
+
+            if (options.removeSymbolLines && options.lineRemoveSymbol) {
+                if (line.indexOf(options.lineRemoveSymbol) !== -1) {
+                    continue;
+                }
+            }
+
+            if (options.singleRemoveSymbol) {
+                line = line.split(options.singleRemoveSymbol).join("");
+            }
+
             if (options.removePunctuation) {
                 line = removePunctuation(line);
             }
+
+            line = normalizeColonSpacing(line);
+
+            if (options.removeEmailSuffix) {
+                line = removeEmailDomainPart(line);
+            }
+
             line = line.trim();
 
             if (!line) continue;
@@ -574,6 +653,10 @@ function getV14Options() {
         twoLines: document.getElementById("twoLines").checked,
         stripFirstField: document.getElementById("stripFirstField").checked,
         removePunctuation: document.getElementById("removePunctuation").checked,
+        removeEmailSuffix: document.getElementById("removeEmailSuffix").checked,
+        removeSymbolLines: document.getElementById("removeSymbolLines").checked,
+        lineRemoveSymbol: document.getElementById("lineRemoveSymbol").value,
+        singleRemoveSymbol: document.getElementById("singleRemoveSymbol").value,
         keyword: (keepKeywordInput ? keepKeywordInput.value : "").trim(),
         caseSensitive: keepCaseInput ? keepCaseInput.checked : false
     };
