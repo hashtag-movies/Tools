@@ -112,6 +112,33 @@ A selected symbol can remove an entire line (optional), or a separate field can 
 <b>Record rule</b><br>
 Blank lines are boundaries. A block containing 3 meaningful non-number lines becomes <code>A:B:C</code>.
 A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line. The optional first-field rule follows the exact Notepad++ pattern.
+<b>How to Use?</b><br>
+  1. Remove number-only lines: To remove a line in which there is only numbers.
+
+2. Format auth/password/secret lines: If text lines are in this format 》
+ auth login: RaAxrThz password: F0e8T5Y3Uy secret: A43OG6axHA5H4Tu1 
+then it changed it into 》 RaAxrThz:F0e8T5Y3Uy:A43OG6axHA5H4Tu1
+
+3. 3-line blocks -> A:B:C : If user,pass,secret in this form 》
+v1sd2ow4 
+3z1x4JY4EE 
+Ws5bwYpk8x7P85YB
+Then this changed in this form 》 v1sd2ow4:3z1x4JY4EE:Ws5bwYpk8x7P85YB
+
+4. 2-line blocks >A:B : Same as 3-line blocks but in it there is only user:pass
+
+5. Remove first field (url:gmail:pass -> gmail:pass) : This will remove url from line and user:pass remains.
+
+6. Remove @domain: part (abcd@__
+.__ ---> abcd:) : If there is an @gmail.com or @yahoo.com or other no matter what will removed from the lines.
+
+7. Remove whole lines containing this symbol: 
+If you want to remove a line which contain an specific line then enter that symbol in box and it will remove whole line.
+
+8. Remove this symbol only: If you want to remove a specific symbol from whole text file enter that symbol in box.
+
+Note: Don't forget to uncheck the box if you don't want to use any function. 
+Use file upload for large files and for Thousand or Million lines. If less lines use paste text.
 </div>
 </div>
 
