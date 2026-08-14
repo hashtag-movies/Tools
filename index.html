@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OCR Credential Record Formatter V9</title>
-  <link rel="icon" type="image/png" href="icon.png">
 <style>
 body{margin:0;background:#101216;color:#eee;font:14px Arial,sans-serif}
 .wrap{max-width:1250px;margin:auto;padding:22px}
@@ -45,6 +44,7 @@ code{word-break:break-all}
   opacity:.8;
   font-size:14px;
 }
+.download-btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;padding:10px 14px;border-radius:8px;background:#4b5563;color:#fff!important;font-weight:bold;text-decoration:none;cursor:pointer;border:0;transition:background .12s ease,transform .12s ease}.download-btn:hover{background:#5b6675}.download-btn:active{transform:scale(.98)}
 </style>
 <style>#keepKeyword{padding:9px;border-radius:8px;border:1px solid #3b4350;background:#080a0e;color:#eee;min-width:260px}</style></head>
 <body>
@@ -60,24 +60,24 @@ Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is pro
     <span id="chooseFileText">Choose TXT File</span>
   </label>
   <span id="selectedFileName" class="selected-file-name">No file selected</span>
-</div><input id="keepKeyword" type="text" placeholder="Keep only lines containing (optional)"><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><button class="secondary"><a id="downloadFile" style="display:none;color:#60a5fa;font-weight:bold" download="formatted.txt">Download formatted.txt</a></button></div><div class="grid">
+</div><input id="keepKeyword" type="text" title="Enter multiple names separated by commas, semicolons, |, or new lines" placeholder="Keep lines containing: netflix, spotify, amazon"><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" class="download-btn" style="display:none" download="formatted.txt">Download TXT</a></div><div class="grid">
 <div class="card">
 <label for="input">Input</label>
 <textarea id="input" spellcheck="false" placeholder="Paste OCR text here..."></textarea>
 
 <div class="box">
 <b>Automatic rules</b><br>
-<label class="check"><input id="removeNumbers" type="checkbox" checked> Remove number-only lines</label><br>
-<label class="check"><input id="authLines" type="checkbox"> Format auth/password/secret lines</label><br>
-<label class="check"><input id="threeLines" type="checkbox"> 3-line blocks → A:B:C</label><br>
-<label class="check"><input id="twoLines" type="checkbox"> 2-line blocks → A:B</label><br>
-<label class="check"><input id="stripFirstField" type="checkbox"> Remove first field (url:gmail:pass → gmail:pass)</label><br>
-<label class="check"><input id="removePunctuation" type="checkbox"> Remove ! ? - from lines</label><br>
-<label class="check"><input id="removeEmailSuffix" type="checkbox"> Remove @domain: part (abcd@___.___: → abcd:)</label><br>
+<label class="check"><input id="removeNumbers" type="checkbox" checked> Remove number-only lines</label>
+<label class="check"><input id="authLines" type="checkbox" checked> Format auth/password/secret lines</label>
+<label class="check"><input id="threeLines" type="checkbox" checked> 3-line blocks → A:B:C</label>
+<label class="check"><input id="twoLines" type="checkbox" checked> 2-line blocks → A:B</label>
+<label class="check"><input id="stripFirstField" type="checkbox"> Remove first field (url:gmail:pass → gmail:pass)</label>
+<label class="check"><input id="removePunctuation" type="checkbox" checked> Remove ! ? - from lines</label>
+<label class="check"><input id="removeEmailSuffix" type="checkbox"> Remove @domain: part (abcd@___.___: → abcd:)</label>
 <label class="check"><input id="removeSymbolLines" type="checkbox"> Remove whole lines containing this symbol:
-<input id="lineRemoveSymbol" type="text" maxlength="2" placeholder="symbol" style="width:50px"></label><br>
+<input id="lineRemoveSymbol" type="text" maxlength="10" placeholder="symbol" style="width:90px"></label>
 <label class="check">Remove this symbol only:
-<input id="singleRemoveSymbol" type="text" maxlength="2" placeholder="symbol" style="width:50px"></label><br>
+<input id="singleRemoveSymbol" type="text" maxlength="1" placeholder="symbol" style="width:90px"></label>
 <label class="check"><input id="blank" type="checkbox" checked> Remove blank lines from output</label>
 </div>
 
@@ -105,40 +105,13 @@ Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is pro
 <code>USER password: PASS secret: SECRET</code><br>
 Both become <code>USER:PASS:SECRET</code>.
 <br><br>
-<b>Additional cleanup rules</b><br>
+<b>Additional cleanup rules</b><br>Multiple keep names: enter them separated by commas, semicolons, |, or new lines; a line is kept when it contains <b>any</b> of them.<br>
 <code>@[^:]+:\s*</code> → <code>:</code> (optional)<br>
 <code>\h*:\h*</code> → <code>:</code> (always on)<br>
 A selected symbol can remove an entire line (optional), or a separate field can remove only that exact symbol.<br><br>
 <b>Record rule</b><br>
 Blank lines are boundaries. A block containing 3 meaningful non-number lines becomes <code>A:B:C</code>.
-A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line. The optional first-field rule follows the exact Notepad++ pattern.<br><br>
-<b>How to Use?</b><br>
-  1. Remove number-only lines: To remove a line in which there is only numbers.<br>
-
-2. Format auth/password/secret lines: If text lines are in this format 》
- auth login: RaAxrThz password: F0e8T5Y3Uy secret: A43OG6axHA5H4Tu1 
-then it changed it into 》 RaAxrThz:F0e8T5Y3Uy:A43OG6axHA5H4Tu1<br>
-
-3. 3-line blocks -> A:B:C : If user,pass,secret in this form 》<br>
-v1sd2ow4 <br>
-3z1x4JY4EE <br>
-Ws5bwYpk8x7P85YB<br>
-Then this changed in this form 》 v1sd2ow4:3z1x4JY4EE:Ws5bwYpk8x7P85YB<br>
-
-4. 2-line blocks >A:B : Same as 3-line blocks but in it there is only user:pass<br>
-
-5. Remove first field (url:gmail:pass -> gmail:pass) : This will remove url from line and user:pass remains.<br>
-
-6. Remove @domain: part (abcd@__
-.__ ---> abcd:) : If there is an @gmail.com or @yahoo.com or other no matter what will removed from the lines.<br>
-
-7. Remove whole lines containing this symbol: 
-If you want to remove a line which contain an specific line then enter that symbol in box and it will remove whole line.<br>
-
-8. Remove this symbol only: If you want to remove a specific symbol from whole text file enter that symbol in box.<br>
-
-Note: Don't forget to uncheck the box if you don't want to use any function. 
-Use file upload for large files and for Thousand or Million lines. If less lines use paste text.
+A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line. The optional first-field rule follows the exact Notepad++ pattern.
 </div>
 </div>
 
@@ -230,6 +203,22 @@ function normalizeColonSpacing(line) {
     // Find:    \h*:\h*
     // Replace: :
     return line.replace(/[ \t]*:[ \t]*/g, ":");
+}
+
+function getKeepKeywords(value) {
+    return String(value || "")
+        .split(/[,;|\n]+/)
+        .map(function(s) { return s.trim(); })
+        .filter(Boolean);
+}
+
+function matchesKeepKeywords(line, keywords, caseSensitive) {
+    if (!keywords.length) return true;
+    const haystack = caseSensitive ? line : line.toLowerCase();
+    return keywords.some(function(keyword) {
+        const needle = caseSensitive ? keyword : keyword.toLowerCase();
+        return haystack.includes(needle);
+    });
 }
 
 function processBlock(rawLines, options) {
@@ -343,6 +332,16 @@ function processBlock(rawLines, options) {
 
     flushRawBuffer();
 
+    // Keep-only filter is applied AFTER records are reconstructed so a 2/3-line
+    // OCR record is never broken apart by the keyword filter. Multiple keywords
+    // are accepted and work as OR: netflix, spotify, amazon.
+    const keywords = getKeepKeywords(options.keyword);
+    if (keywords.length) {
+        return result.filter(function(line) {
+            return matchesKeepKeywords(line, keywords, options.caseSensitive);
+        });
+    }
+
     return result;
 }
 
@@ -357,7 +356,9 @@ function processText() {
         removeEmailSuffix: document.getElementById("removeEmailSuffix").checked,
         removeSymbolLines: document.getElementById("removeSymbolLines").checked,
         lineRemoveSymbol: document.getElementById("lineRemoveSymbol").value,
-        singleRemoveSymbol: document.getElementById("singleRemoveSymbol").value
+        singleRemoveSymbol: document.getElementById("singleRemoveSymbol").value,
+        keyword: document.getElementById("keepKeyword").value,
+        caseSensitive: document.getElementById("keepCase").checked
     };
 
     const text = normalizeNewlines(input.value);
@@ -492,6 +493,7 @@ auth login: PHTn5bco password: ORm1JpYLQU secret: Yal332vTM720J4mJ`;
 
 /* LARGE_FILE_MODE_V14
    Cross-origin-safe large-file output:
+   - Does NOT call showSaveFilePicker (blocked in ChatGPT/iframe previews).
    - Writes output to the browser's Origin Private File System (OPFS).
    - Creates a download link from the completed disk-backed File.
    - Falls back to a Blob only if OPFS is unavailable.
@@ -549,6 +551,22 @@ self.onmessage = function(event) {
 
     function normalizeColonSpacing(line) {
         return line.replace(/[ \t]*:[ \t]*/g, ":");
+    }
+
+    function getKeepKeywords(value) {
+        return String(value || "")
+            .split(/[,;|\n]+/)
+            .map(function(s) { return s.trim(); })
+            .filter(Boolean);
+    }
+
+    function matchesKeepKeywords(line, keywords, caseSensitive) {
+        if (!keywords.length) return true;
+        const haystack = caseSensitive ? line : line.toLowerCase();
+        return keywords.some(function(keyword) {
+            const needle = caseSensitive ? keyword : keyword.toLowerCase();
+            return haystack.indexOf(needle) !== -1;
+        });
     }
 
     function formatAuth(line) {
@@ -625,22 +643,6 @@ self.onmessage = function(event) {
 
             if (!line) continue;
 
-            /*
-              Keep-only filter.
-              Empty keyword = disabled.
-            */
-            if (options.keyword) {
-                const haystack = options.caseSensitive
-                    ? line
-                    : line.toLowerCase();
-
-                const needle = options.caseSensitive
-                    ? options.keyword
-                    : options.keyword.toLowerCase();
-
-                if (haystack.indexOf(needle) === -1) continue;
-            }
-
             const auth = options.authLines ? formatAuth(line) : null;
 
             if (auth !== null) {
@@ -672,6 +674,14 @@ self.onmessage = function(event) {
         }
 
         flushRaw();
+
+        const outputKeywords = getKeepKeywords(options.keyword);
+        if (outputKeywords.length) {
+            return output.filter(function(line) {
+                return matchesKeepKeywords(line, outputKeywords, options.caseSensitive);
+            }).join("\n");
+        }
+
         return output.join("\n");
     }
 
@@ -770,7 +780,7 @@ async function finishV14Output() {
         downloadFile.dataset.objectUrl = url;
         downloadFile.download = "formatted.txt";
         downloadFile.textContent =
-            "Download formatted.txt (" +
+            "Download TXT (" +
             (file.size / 1048576).toFixed(1) +
             " MB)";
         downloadFile.style.display = "inline-block";
@@ -786,7 +796,7 @@ async function finishV14Output() {
 
     downloadFile.href = url;
     downloadFile.download = "formatted.txt";
-    downloadFile.textContent = "Download formatted.txt";
+    downloadFile.textContent = "Download TXT";
     downloadFile.style.display = "inline-block";
 
     fallbackParts = [];
@@ -869,7 +879,7 @@ async function processLargeTXT() {
         fileStatus.textContent =
             "Processing " + file.name +
             " — " + percent.toFixed(1) + "%" +
-            (keyword ? " — keeping lines containing: " + keyword : "");
+            (keyword ? " — keeping lines containing any of: " + keyword : "");
     }
 
     async function sendNext() {
