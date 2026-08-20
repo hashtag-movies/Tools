@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OCR Record Formatter V22</title>
-    <link rel="icon" type="image/png" href="icon.png"> 
 <style>
 body{margin:0;background:#101216;color:#eee;font:14px Arial,sans-serif}
 .wrap{max-width:1250px;margin:auto;padding:22px}
@@ -46,11 +45,16 @@ code{word-break:break-all}
   font-size:14px;
 }
 .download-btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;padding:10px 14px;border-radius:8px;background:#4b5563;color:#fff!important;font-weight:bold;text-decoration:none;cursor:pointer;border:0;transition:background .12s ease,transform .12s ease}.download-btn:hover{background:#5b6675}.download-btn:active{transform:scale(.98)}
-</style>
-<style>#keepKeyword{padding:9px;border-radius:8px;border:1px solid #3b4350;background:#080a0e;color:#eee;min-width:260px}</style></head>
+#keepKeywordHint{font-size:11px;opacity:.65;max-width:260px;line-height:1.25}</style>
+<style>#keepKeyword{padding:9px;border-radius:8px;border:1px solid #3b4350;background:#080a0e;color:#eee;min-width:260px}
+.custom-format-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.custom-format-grid input{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #3b4350;background:#080a0e;color:#eee;font:14px Consolas,monospace}
+.custom-format-help{font-size:11px;opacity:.7;line-height:1.45;margin-top:6px}
+@media(max-width:850px){.custom-format-grid{grid-template-columns:1fr}}
+</style></head>
 <body>
 <div class="wrap">
-<h1>OCR Record Formatter V22</h1>
+<h1>OCR Record Formatter V24</h1>
 <p class="sub">Designed for messy OCR text: blank lines separate records, number-only OCR lines are removed, auth-style lines are recognized separately, and 2/3-line blocks are reconstructed without crossing record boundaries.</p>
 
 <div class="box" style="margin-bottom:16px"><b>
@@ -61,24 +65,41 @@ Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is pro
     <span id="chooseFileText">Choose TXT File</span>
   </label>
   <span id="selectedFileName" class="selected-file-name">No file selected</span>
-</div><input id="keepKeyword" type="text" title="Enter multiple names separated by commas, semicolons, |, or new lines. A line is kept if it contains any name." placeholder="Keep lines containing: netflix, spotify, amazon"><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" class="download-btn" style="display:none" download="formatted.txt">Download TXT</a></div><div class="grid">
+</div><input id="keepKeyword" type="text" title="Enter multiple names separated by commas, semicolons, |, or new lines. A line is kept if it contains any name." placeholder="Keep lines containing: netflix, spotify, amazon"><span id="keepKeywordHint" class="keyword-hint">Leave blank to keep all lines. Separate multiple names with comma, ;, |, or new lines.</span><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" class="download-btn" style="display:none" download="formatted.txt">Download TXT</a></div><div class="grid">
 <div class="card">
 <label for="input">Input</label>
 <textarea id="input" spellcheck="false" placeholder="Paste OCR text here..."></textarea>
 
 <div class="box">
 <b>Automatic rules</b><br>
-<label class="check"><input id="removeNumbers" type="checkbox" checked> Remove number-only lines</label><br>
-<label class="check"><input id="authLines" type="checkbox" > Format auth/password/secret lines</label><br>
-<label class="check"><input id="threeLines" type="checkbox" > 3-line blocks → A:B:C</label><br>
-<label class="check"><input id="twoLines" type="checkbox" > 2-line blocks → A:B</label><br>
-<label class="check"><input id="stripFirstField" type="checkbox"> Remove first field (url:gmail:pass → gmail:pass)</label><br>
-<label class="check"><input id="removePunctuation" type="checkbox" > Remove ! ? - from lines</label><br>
-<label class="check"><input id="removeEmailSuffix" type="checkbox"> Remove @domain: part (abcd@___.___: → abcd:)</label><br>
+<label class="check"><input id="removeNumbers" type="checkbox" checked> Remove number-only lines</label>
+<label class="check"><input id="authLines" type="checkbox" checked> Format auth/password/secret lines</label>
+<label class="check"><input id="threeLines" type="checkbox" checked> 3-line blocks → A:B:C</label>
+<label class="check"><input id="twoLines" type="checkbox" checked> 2-line blocks → A:B</label>
+<label class="check"><input id="stripFirstField" type="checkbox"> Remove first field (url:gmail:pass → gmail:pass)</label>
+<label class="check"><input id="removePunctuation" type="checkbox" checked> Remove ! ? - from lines</label>
+<label class="check"><input id="removeEmailSuffix" type="checkbox"> Remove @domain: part (abcd@___.___: → abcd:)</label>
 <label class="check"><input id="removeSymbolLines" type="checkbox"> Remove whole lines containing this symbol:
-<input id="lineRemoveSymbol" type="text" maxlength="10" placeholder="symbol" style="width:90px"></label><br>
+<input id="lineRemoveSymbol" type="text" maxlength="10" placeholder="symbol" style="width:90px"></label>
 <label class="check">Remove this symbol only:
 <input id="singleRemoveSymbol" type="text" maxlength="1" placeholder="symbol" style="width:90px"></label>
+
+<div style="margin-top:14px;border-top:1px solid #303744;padding-top:12px">
+  <label class="check"><input id="customFormatEnabled" type="checkbox"> Custom field converter</label>
+  <div class="custom-format-grid">
+    <div>
+      <label for="customInputFormat">Input format</label>
+      <input id="customInputFormat" type="text" spellcheck="false" placeholder="username:password:balance">
+    </div>
+    <div>
+      <label for="customOutputFormat">Desired format</label>
+      <input id="customOutputFormat" type="text" spellcheck="false" placeholder="username:password">
+    </div>
+  </div>
+  <div class="custom-format-help">
+    Enter field names, not actual values. Examples: <code>URL:id:gmail:username:password:balance</code> → <code>username:password</code>, or <code>username password balance</code> → <code>username:balance</code>. The separator is taken from the format you enter.
+  </div>
+</div>
 </div>
 
 <div class="row">
@@ -109,6 +130,1120 @@ Both become <code>USER:PASS:SECRET</code>.
 <code>@[^:]+:\s*</code> → <code>:</code> (optional)<br>
 <code>\h*:\h*</code> → <code>:</code> (always on)<br>
 A selected symbol can remove an entire line (optional), or a separate field can remove only that exact symbol.<br><br>
+<b>Record rule</b><br>
+Blank lines are boundaries. A block containing 3 meaningful non-number lines becomes <code>A:B:C</code>.
+A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line. The optional first-field rule follows the exact Notepad++ pattern.
+</div>
+</div>
+
+<script>
+"use strict";
+
+const input = document.getElementById("input");
+const output = document.getElementById("output");
+const status = document.getElementById("status");
+
+function normalizeNewlines(text) {
+    return text.replace(/\r\n?/g, "\n");
+}
+
+function cleanLine(s) {
+    return s.trim();
+}
+
+/*
+  Remove lines matching:
+  ^\h*\d+(?:\.\d+)?\h*\R
+
+  This deliberately removes only a line whose complete content is a
+  number or decimal number. It does NOT remove digits inside credentials.
+*/
+function removeNumberOnlyLines(lines) {
+    return lines.filter(line => !/^[ \t]*\d+(?:\.\d+)?[ \t]*$/.test(line));
+}
+
+/*
+  Remove trailing transaction suffixes such as:
+    " 12.06 txn 93"
+    " 11.98 txn 226"
+    " 11.97 txn 234"
+
+  Find what:
+  \s+\d+(?:\.\d+)?\s+txn\s+\d+\s*$
+
+  This is always enabled.
+*/
+function removeTxnSuffix(line) {
+    return line.replace(/\s+\d+(?:\.\d+)?\s+txn\s+\d+\s*$/i, "");
+}
+
+/*
+  Optionally remove !, ? and - wherever they occur in a line.
+*/
+function removeLinePunctuation(line) {
+    return line.replace(/[!?\-]/g, "");
+}
+
+/*
+  Full user-specified pattern:
+  (?i)^auth\\s+login:\\s*(\\S+)\\s+password:\\s*(\\S+)\\s+secret:\\s*(\\S+)\\s*$
+
+  Plus the OCR variant visible in the user's screenshot:
+  USER password: PASS secret: SECRET
+
+  The latter is important because OCR can drop "auth login:".
+*/
+function formatAuthLine(line) {
+    // Accept: auth login: ..., login: ..., or type: auth login: ...
+    // by looking for the login/password/secret sequence anywhere in the line.
+    let m = line.match(/\blogin:\s*(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i);
+    if (m) return m[1] + ":" + m[2] + ":" + m[3];
+
+    // OCR can lose "login:" entirely.
+    m = line.match(/^(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i);
+    if (m) return m[1] + ":" + m[2] + ":" + m[3];
+
+    return null;
+}
+
+/*
+  Process ONE blank-line-separated record.
+  This is intentionally isolated so no record can consume data from
+  the next record.
+*/
+
+function removeEmailDomainPart(line) {
+    // User's Notepad++ rule:
+    // Find:    @[^:]+:\s*
+    // Replace: :
+    return line.replace(/@[^:]+:\s*/g, ":");
+}
+
+function normalizeColonSpacing(line) {
+    // User's Notepad++ rule:
+    // Find:    \h*:\h*
+    // Replace: :
+    return line.replace(/[ \t]*:[ \t]*/g, ":");
+}
+
+function getKeepKeywords(value) {
+    return String(value || "")
+        .split(/[,;|\n]+/)
+        .map(function(s) { return s.trim(); })
+        .filter(Boolean);
+}
+
+function matchesKeepKeywords(line, keywords, caseSensitive) {
+    if (!keywords.length) return true;
+    const haystack = caseSensitive ? line : line.toLowerCase();
+    return keywords.some(function(keyword) {
+        const needle = caseSensitive ? keyword : keyword.toLowerCase();
+        return haystack.includes(needle);
+    });
+}
+
+function getFormatParts(format) {
+    const value = String(format || "").trim();
+    if (!value) return {names: [], delimiter: null};
+    if (value.includes(":")) return {names: value.split(":").map(s => s.trim()).filter(Boolean), delimiter: ":"};
+    if (value.includes("|")) return {names: value.split("|").map(s => s.trim()).filter(Boolean), delimiter: "|"};
+    return {names: value.split(/\s+/).map(s => s.trim()).filter(Boolean), delimiter: "whitespace"};
+}
+
+function convertCustomFormat(line, inputFormat, outputFormat) {
+    const source = getFormatParts(inputFormat);
+    const target = getFormatParts(outputFormat);
+    if (!source.names.length || !target.names.length) return null;
+
+    let fields;
+    if (source.delimiter === ":") {
+        fields = line.split(":").map(s => s.trim());
+        // URLs can contain ':' (for example https://example.com). If the
+        // schema contains a URL/URI field, merge the extra colon-split pieces
+        // into that field until the schema field count matches.
+        const urlIndex = source.names.findIndex(name => /^(url|uri|website)$/i.test(name));
+        if (fields.length > source.names.length && urlIndex >= 0) {
+            while (fields.length > source.names.length && urlIndex + 1 < fields.length) {
+                fields[urlIndex] = fields[urlIndex] + ":" + fields[urlIndex + 1];
+                fields.splice(urlIndex + 1, 1);
+            }
+        }
+    } else if (source.delimiter === "|") {
+        fields = line.split("|").map(s => s.trim());
+    } else {
+        fields = line.trim().split(/\s+/).filter(Boolean);
+    }
+
+    if (fields.length !== source.names.length) return null;
+
+    const map = Object.create(null);
+    source.names.forEach((name, i) => { map[name.toLowerCase()] = fields[i]; });
+
+    const values = [];
+    for (const name of target.names) {
+        const key = name.toLowerCase();
+        if (!(key in map)) return null;
+        values.push(map[key]);
+    }
+    return values.join(target.delimiter === "whitespace" ? " " : target.delimiter);
+}
+
+function processBlock(rawLines, options) {
+    let lines = rawLines
+        .map(cleanLine)
+        .filter(Boolean);
+
+    if (!lines.length) return [];
+
+    // Remove standalone integer/decimal OCR artifacts before counting fields.
+    if (options.removeNumbers) {
+        lines = removeNumberOnlyLines(lines);
+    }
+
+    if (!lines.length) return [];
+
+    const result = [];
+    let rawBuffer = [];
+
+    function flushRawBuffer() {
+        if (!rawBuffer.length) return;
+
+        const vals = rawBuffer.slice();
+
+        if (vals.length === 3 && options.threeLines) {
+            result.push(vals[0] + ":" + vals[1] + ":" + vals[2]);
+        } else if (vals.length === 2 && options.twoLines) {
+            result.push(vals[0] + ":" + vals[1]);
+        } else if (vals.length === 1) {
+            result.push(vals[0]);
+        } else {
+            // Preserve unexpected data rather than incorrectly combining it.
+            for (const v of vals) result.push(v);
+        }
+
+        rawBuffer = [];
+    }
+
+    for (let line of lines) {
+        // Always-on cleanup requested by the user.
+        line = removeTxnSuffix(line);
+        line = line.trim();
+
+        // Optional: remove the entire line if it contains the selected symbol.
+        if (options.removeSymbolLines && options.lineRemoveSymbol) {
+            if (line.includes(options.lineRemoveSymbol)) {
+                continue;
+            }
+        }
+
+        // Optional: remove only the exact symbol entered by the user.
+        if (options.singleRemoveSymbol) {
+            line = line.split(options.singleRemoveSymbol).join("");
+        }
+
+        if (options.removePunctuation) {
+            line = removeLinePunctuation(line);
+        }
+
+        // Always normalize spaces around ":".
+        line = normalizeColonSpacing(line);
+
+        // Optional: abcd@___.___: -> abcd:
+        if (options.removeEmailSuffix) {
+            line = removeEmailDomainPart(line);
+        }
+
+        line = line.trim();
+
+        if (!line) continue;
+
+        if (options.authLines) {
+            const auth = formatAuthLine(line);
+
+            if (auth !== null) {
+                flushRawBuffer();
+                result.push(auth);
+                continue;
+            }
+        }
+
+        /*
+          A line already containing ":" is considered a finished record.
+          Do not merge it with surrounding OCR lines.
+        */
+        if (options.customFormatEnabled) {
+            const converted = convertCustomFormat(line, options.customInputFormat, options.customOutputFormat);
+            if (converted !== null) {
+                flushRawBuffer();
+                result.push(converted);
+                continue;
+            }
+        }
+
+        /*
+          Optional Notepad++ rule:
+          Find:    ^.*:(.*:.*)$
+          Replace: $1
+
+          Therefore:
+            url:gmail:pass -> gmail:pass
+            a:b:c:d        -> b:c:d
+            a:b            -> unchanged
+        */
+        if (options.stripFirstField) {
+            const firstFieldMatch = line.match(/^.*:(.*:.*)$/);
+            if (firstFieldMatch) {
+                line = firstFieldMatch[1];
+            }
+        }
+
+        if (line.includes(":")) {
+            flushRawBuffer();
+            result.push(line);
+            continue;
+        }
+
+        rawBuffer.push(line);
+    }
+
+    flushRawBuffer();
+
+    // Keep-only filter is applied AFTER records are reconstructed so a 2/3-line
+    // OCR record is never broken apart by the keyword filter. Multiple keywords
+    // are accepted and work as OR: netflix, spotify, amazon.
+    const keywords = getKeepKeywords(options.keyword);
+    if (keywords.length) {
+        return result.filter(function(line) {
+            return matchesKeepKeywords(line, keywords, options.caseSensitive);
+        });
+    }
+
+    return result;
+}
+
+function getChecked(id, fallback) {
+    const el = document.getElementById(id);
+    return el ? !!el.checked : fallback;
+}
+
+function getValue(id, fallback) {
+    const el = document.getElementById(id);
+    return el ? el.value : fallback;
+}
+
+function processText() {
+    try {
+        const options = {
+            removeNumbers: getChecked("removeNumbers", true),
+            authLines: getChecked("authLines", true),
+            threeLines: getChecked("threeLines", true),
+            twoLines: getChecked("twoLines", true),
+            stripFirstField: getChecked("stripFirstField", false),
+            removePunctuation: getChecked("removePunctuation", true),
+            removeEmailSuffix: getChecked("removeEmailSuffix", false),
+            removeSymbolLines: getChecked("removeSymbolLines", false),
+            lineRemoveSymbol: getValue("lineRemoveSymbol", ""),
+            singleRemoveSymbol: getValue("singleRemoveSymbol", ""),
+            keyword: getValue("keepKeyword", "").trim(),
+            caseSensitive: getChecked("keepCase", false),
+            customFormatEnabled: getChecked("customFormatEnabled", false),
+            customInputFormat: getValue("customInputFormat", ""),
+            customOutputFormat: getValue("customOutputFormat", "")
+        };
+
+        const text = normalizeNewlines(input.value || "");
+        if (!text.trim()) {
+            output.value = "";
+            status.textContent = "Paste text into the Input box first.";
+            return;
+        }
+
+        const physicalLines = text.split("\n");
+
+        // Blank/space-only lines are record boundaries.
+        const blocks = [];
+        let current = [];
+
+        for (const line of physicalLines) {
+            if (/^[ \t]*$/.test(line)) {
+                if (current.length) {
+                    blocks.push(current);
+                    current = [];
+                }
+            } else {
+                current.push(line);
+            }
+        }
+        if (current.length) blocks.push(current);
+
+        const outputLines = [];
+
+        for (const block of blocks) {
+            const processed = processBlock(block, options);
+            if (processed && processed.length) {
+                outputLines.push(...processed);
+            }
+        }
+
+        let finalLines = outputLines;
+
+        if (options.removeNumbers) {
+            finalLines = finalLines.filter(
+                line => !/^[ \t]*\d+(?:\.\d+)?[ \t]*$/.test(line)
+            );
+        }
+
+        output.value = finalLines.join("\n");
+
+        const count = finalLines.length;
+
+        if (options.keyword) {
+            const keywords = getKeepKeywords(options.keyword);
+            status.textContent =
+                count + " output line(s) generated from " +
+                blocks.length + " record block(s). " +
+                keywords.length + " keep-name filter(s) active.";
+            if (count === 0) {
+                status.textContent +=
+                    " No output matched the names in the Keep-only field.";
+            }
+        } else {
+            status.textContent =
+                count + " output line(s) generated from " +
+                blocks.length + " record block(s).";
+        }
+    } catch (err) {
+        output.value = "";
+        status.textContent = "Processing error: " + (err && err.message ? err.message : String(err));
+        console.error("OCR formatter paste-mode error:", err);
+    }
+}
+
+input.addEventListener("input", processText);
+document.getElementById("process").addEventListener("click", processText);
+
+document.getElementById("clear").addEventListener("click", () => {
+    input.value = "";
+    output.value = "";
+    status.textContent = "Cleared.";
+    input.focus();
+});
+
+document.getElementById("copy").addEventListener("click", async () => {
+    if (!output.value) {
+        status.textContent = "Nothing to copy.";
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(output.value);
+    } catch {
+        output.focus();
+        output.select();
+        document.execCommand("copy");
+    }
+    status.textContent = "Copied to clipboard.";
+});
+
+document.getElementById("download").addEventListener("click", () => {
+    if (!output.value) {
+        status.textContent = "Nothing to download.";
+        return;
+    }
+
+    const blob = new Blob([output.value], {type:"text/plain;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "formatted.txt";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    status.textContent = "Downloaded formatted.txt.";
+});
+
+document.getElementById("sample").addEventListener("click", () => {
+    input.value =
+`auth login: wvu7P4Qp password: JWMI51vVTT secret: X7ay025ISQSbc7Zo
+
+7PHT62t4
+Vh27JgoPJn
+sCt8FLnzW0OZvJqK
+0
+
+auth login: ZeMTL9dx password: hJ0tnEvgkE secret: wn7MiogCCc6Zp7a3
+
+7PHT62t4
+soe3Re9l
+cwScO6L2OC
+
+WDpVp2HO
+efCIATYWml
+mseS3RcyIpxClglN
+3
+
+BsnLx1sm
+sbsjmK6spP
+AgDF7i9wqHka6Acx
+
+MHTsyNCO
+kLRBghkiIP
+bHPhL5xvOuOIQHbf
+
+9vqtR0IG
+3gASTVVmHr
+OnSc9BgwAg76rsXT
+1.4
+
+oe9pjdYw password: avn0xU2zqX secret: MMKfP2b3YXTOep7g
+
+auth login: 9bZ3c5GM password: 0SATVsZZOH secret: AZ6s5pLUgwXPxOGU
+
+auth login: PHTn5bco password: ORm1JpYLQU secret: Yal332vTM720J4mJ`;
+
+    processText();
+});
+
+/* LARGE_FILE_MODE_V14
+   Cross-origin-safe large-file output:
+   - Does NOT call showSaveFilePicker (blocked in ChatGPT/iframe previews).
+   - Writes output to the browser's Origin Private File System (OPFS).
+   - Creates a download link from the completed disk-backed File.
+   - Falls back to a Blob only if OPFS is unavailable.
+*/
+const fileInput = document.getElementById("fileInput");
+const selectedFileName = document.getElementById("selectedFileName");
+const processFileButton = document.getElementById("processFile");
+const cancelFileButton = document.getElementById("cancelFile");
+const fileStatus = document.getElementById("fileStatus");
+const progress = document.getElementById("progress");
+const downloadFile = document.getElementById("downloadFile");
+const keepKeywordInput = document.getElementById("keepKeyword");
+const keepCaseInput = document.getElementById("keepCase");
+
+fileInput.addEventListener("change", function () {
+    if (this.files && this.files.length > 0) {
+        selectedFileName.textContent = this.files[0].name;
+        selectedFileName.title = this.files[0].name;
+        document.getElementById("chooseFileText").textContent = "File selected";
+        fileStatus.textContent = "Selected: " + this.files[0].name;
+    } else {
+        selectedFileName.textContent = "No file selected";
+        selectedFileName.title = "";
+        document.getElementById("chooseFileText").textContent = "Choose TXT File";
+        fileStatus.textContent = "No file selected.";
+    }
+});
+let fileWorker = null;
+let fileCancelled = false;
+let opfsWritable = null;
+let opfsFileHandle = null;
+let fallbackParts = [];
+
+const WORKER_CODE_V14 = String.raw`
+self.onmessage = function(event) {
+    const data = event.data;
+    const options = data.options;
+    let currentBlock = [];
+
+    function isNumberOnly(line) {
+        return /^[ \t]*\d+(?:\.\d+)?[ \t]*$/.test(line);
+    }
+
+    function removeTxn(line) {
+        return line.replace(/\s+\d+(?:\.\d+)?\s+txn\s+\d+\s*$/i, "");
+    }
+
+    function removePunctuation(line) {
+        return line.replace(/[!?-]/g, "");
+    }
+
+
+    function removeEmailDomainPart(line) {
+        return line.replace(/@[^:]+:\s*/g, ":");
+    }
+
+    function normalizeColonSpacing(line) {
+        return line.replace(/[ \t]*:[ \t]*/g, ":");
+    }
+
+    function getKeepKeywords(value) {
+        return String(value || "")
+            .split(/[,;|\n]+/)
+            .map(function(s) { return s.trim(); })
+            .filter(Boolean);
+    }
+
+    function matchesKeepKeywords(line, keywords, caseSensitive) {
+        if (!keywords.length) return true;
+        const haystack = caseSensitive ? line : line.toLowerCase();
+        return keywords.some(function(keyword) {
+            const needle = caseSensitive ? keyword : keyword.toLowerCase();
+            return haystack.indexOf(needle) !== -1;
+        });
+    }
+
+    function formatAuth(line) {
+        let m = line.match(
+            /\blogin:\s*(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i
+        );
+        if (m) return m[1] + ":" + m[2] + ":" + m[3];
+
+        m = line.match(
+            /^(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i
+        );
+        if (m) return m[1] + ":" + m[2] + ":" + m[3];
+
+        return null;
+    }
+
+    function getFormatParts(format) {
+        const value = String(format || "").trim();
+        if (!value) return {names: [], delimiter: null};
+        if (value.indexOf(":") !== -1) return {names: value.split(":").map(function(s){return s.trim();}).filter(Boolean), delimiter: ":"};
+        if (value.indexOf("|") !== -1) return {names: value.split("|").map(function(s){return s.trim();}).filter(Boolean), delimiter: "|"};
+        return {names: value.split(/\s+/).map(function(s){return s.trim();}).filter(Boolean), delimiter: "whitespace"};
+    }
+
+    function convertCustomFormat(line, inputFormat, outputFormat) {
+        const source = getFormatParts(inputFormat);
+        const target = getFormatParts(outputFormat);
+        if (!source.names.length || !target.names.length) return null;
+        let fields;
+        if (source.delimiter === ":") {
+            fields = line.split(":").map(function(s){return s.trim();});
+            const urlIndex = source.names.findIndex(function(name){ return /^(url|uri|website)$/i.test(name); });
+            if (fields.length > source.names.length && urlIndex >= 0) {
+                while (fields.length > source.names.length && urlIndex + 1 < fields.length) {
+                    fields[urlIndex] = fields[urlIndex] + ":" + fields[urlIndex + 1];
+                    fields.splice(urlIndex + 1, 1);
+                }
+            }
+        } else if (source.delimiter === "|") {
+            fields = line.split("|").map(function(s){return s.trim();});
+        } else {
+            fields = line.trim().split(/\s+/).filter(Boolean);
+        }
+        if (fields.length !== source.names.length) return null;
+        const map = Object.create(null);
+        source.names.forEach(function(name, i){ map[name.toLowerCase()] = fields[i]; });
+        const values = [];
+        for (const name of target.names) {
+            const key = name.toLowerCase();
+            if (!(key in map)) return null;
+            values.push(map[key]);
+        }
+        return values.join(target.delimiter === "whitespace" ? " " : target.delimiter);
+    }
+
+    function flushBlock() {
+        if (!currentBlock.length) return "";
+
+        let lines = currentBlock
+            .map(function(x) { return x.trim(); })
+            .filter(Boolean);
+
+        currentBlock = [];
+
+        if (options.removeNumbers) {
+            lines = lines.filter(function(x) {
+                return !isNumberOnly(x);
+            });
+        }
+
+        const output = [];
+        let raw = [];
+
+        function flushRaw() {
+            if (!raw.length) return;
+
+            if (raw.length === 3 && options.threeLines) {
+                output.push(raw[0] + ":" + raw[1] + ":" + raw[2]);
+            } else if (raw.length === 2 && options.twoLines) {
+                output.push(raw[0] + ":" + raw[1]);
+            } else {
+                output.push.apply(output, raw);
+            }
+
+            raw = [];
+        }
+
+        for (let line of lines) {
+            line = removeTxn(line);
+            line = line.trim();
+
+            if (options.removeSymbolLines && options.lineRemoveSymbol) {
+                if (line.indexOf(options.lineRemoveSymbol) !== -1) {
+                    continue;
+                }
+            }
+
+            if (options.singleRemoveSymbol) {
+                line = line.split(options.singleRemoveSymbol).join("");
+            }
+
+            if (options.removePunctuation) {
+                line = removePunctuation(line);
+            }
+
+            line = normalizeColonSpacing(line);
+
+            if (options.removeEmailSuffix) {
+                line = removeEmailDomainPart(line);
+            }
+
+            line = line.trim();
+
+            if (!line) continue;
+
+            const auth = options.authLines ? formatAuth(line) : null;
+
+            if (auth !== null) {
+                flushRaw();
+                output.push(auth);
+                continue;
+            }
+
+            if (options.customFormatEnabled) {
+                const converted = convertCustomFormat(line, options.customInputFormat, options.customOutputFormat);
+                if (converted !== null) {
+                    flushRaw();
+                    output.push(converted);
+                    continue;
+                }
+            }
+
+            /*
+              Optional first-field removal:
+              url:gmail:pass -> gmail:pass
+              Equivalent to:
+              ^.*:(.*:.*)$
+              -> $1
+            */
+            if (options.stripFirstField) {
+                const firstFieldMatch = line.match(/^.*:(.*:.*)$/);
+                if (firstFieldMatch) {
+                    line = firstFieldMatch[1].trim();
+                }
+            }
+
+            if (line.indexOf(":") !== -1) {
+                flushRaw();
+                output.push(line);
+            } else {
+                raw.push(line);
+            }
+        }
+
+        flushRaw();
+
+        const outputKeywords = getKeepKeywords(options.keyword);
+        if (outputKeywords.length) {
+            return output.filter(function(line) {
+                return matchesKeepKeywords(line, outputKeywords, options.caseSensitive);
+            }).join("\n");
+        }
+
+        return output.join("\n");
+    }
+
+    try {
+        const lines = data.text.replace(/\r\n?/g, "\n").split("\n");
+        const results = [];
+
+        for (const line of lines) {
+            if (/^[ \t]*$/.test(line)) {
+                const result = flushBlock();
+                if (result) results.push(result);
+            } else {
+                currentBlock.push(line);
+            }
+        }
+
+        if (data.finalChunk) {
+            const result = flushBlock();
+            if (result) results.push(result);
+        }
+
+        self.postMessage({
+            type: "result",
+            finalChunk: data.finalChunk,
+            text: results.join("\n")
+        });
+    } catch (error) {
+        self.postMessage({
+            type: "error",
+            message: error && error.stack ? error.stack : String(error)
+        });
+    }
+};
+`;
+
+function createV14Worker() {
+    return new Worker(URL.createObjectURL(
+        new Blob([WORKER_CODE_V14], {type: "application/javascript"})
+    ));
+}
+
+function getV14Options() {
+    return {
+        removeNumbers: document.getElementById("removeNumbers").checked,
+        authLines: document.getElementById("authLines").checked,
+        threeLines: document.getElementById("threeLines").checked,
+        twoLines: document.getElementById("twoLines").checked,
+        stripFirstField: document.getElementById("stripFirstField").checked,
+        removePunctuation: document.getElementById("removePunctuation").checked,
+        removeEmailSuffix: document.getElementById("removeEmailSuffix").checked,
+        removeSymbolLines: document.getElementById("removeSymbolLines").checked,
+        lineRemoveSymbol: document.getElementById("lineRemoveSymbol").value,
+        singleRemoveSymbol: document.getElementById("singleRemoveSymbol").value,
+        keyword: (keepKeywordInput ? keepKeywordInput.value : "").trim(),
+        caseSensitive: keepCaseInput ? keepCaseInput.checked : false,
+        customFormatEnabled: document.getElementById("customFormatEnabled").checked,
+        customInputFormat: document.getElementById("customInputFormat").value,
+        customOutputFormat: document.getElementById("customOutputFormat").value
+    };
+}
+
+async function openV14Output() {
+    /*
+      OPFS is available in modern Chromium browsers even when the page is
+      embedded in a cross-origin iframe. This avoids showSaveFilePicker,
+      which is exactly what failed in the screenshot.
+    */
+    if (!navigator.storage || !navigator.storage.getDirectory) {
+        return false;
+    }
+
+    const root = await navigator.storage.getDirectory();
+
+    const filename =
+        "formatted_" +
+        Date.now() +
+        ".txt";
+
+    opfsFileHandle = await root.getFileHandle(filename, {create: true});
+    opfsWritable = await opfsFileHandle.createWritable();
+
+    return true;
+}
+
+async function finishV14Output() {
+    if (opfsWritable) {
+        await opfsWritable.close();
+        opfsWritable = null;
+
+        const file = await opfsFileHandle.getFile();
+
+        if (downloadFile.dataset.objectUrl) {
+            URL.revokeObjectURL(downloadFile.dataset.objectUrl);
+        }
+
+        const url = URL.createObjectURL(file);
+
+        downloadFile.href = url;
+        downloadFile.dataset.objectUrl = url;
+        downloadFile.download = "formatted.txt";
+        downloadFile.textContent =
+            "Download TXT (" +
+            (file.size / 1048576).toFixed(1) +
+            " MB)";
+        downloadFile.style.display = "inline-block";
+
+        return file.size;
+    }
+
+    const blob = new Blob(fallbackParts, {
+        type: "text/plain;charset=utf-8"
+    });
+
+    if (downloadFile.dataset.objectUrl) {
+        URL.revokeObjectURL(downloadFile.dataset.objectUrl);
+    }
+
+    const url = URL.createObjectURL(blob);
+
+    downloadFile.href = url;
+    downloadFile.dataset.objectUrl = url;
+    downloadFile.download = "formatted.txt";
+    downloadFile.textContent =
+        "Download TXT (" +
+        (blob.size / 1048576).toFixed(1) +
+        " MB)";
+    downloadFile.style.display = "inline-flex";
+
+    fallbackParts = [];
+
+    return blob.size;
+}
+
+async function processLargeTXT() {
+    if (!fileInput.files || !fileInput.files.length) {
+        fileStatus.textContent = "Please select a TXT file first.";
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const CHUNK_SIZE = 4 * 1024 * 1024;
+
+    fileCancelled = false;
+    fallbackParts = [];
+    opfsWritable = null;
+    opfsFileHandle = null;
+
+    if (fileWorker) fileWorker.terminate();
+    fileWorker = createV14Worker();
+
+    processFileButton.disabled = true;
+    cancelFileButton.disabled = false;
+    progress.style.display = "block";
+    progress.value = 0;
+    downloadFile.style.display = "none";
+    if (downloadFile.dataset.objectUrl) {
+        URL.revokeObjectURL(downloadFile.dataset.objectUrl);
+        delete downloadFile.dataset.objectUrl;
+    }
+    downloadFile.removeAttribute("href");
+
+    /*
+      First try OPFS. This is the fix for the error shown in the screenshot:
+      we never call window.showSaveFilePicker inside the embedded page.
+    */
+    let usingOPFS = false;
+
+    try {
+        usingOPFS = await openV14Output();
+    } catch (_) {
+        usingOPFS = false;
+    }
+
+    if (!usingOPFS) {
+        /*
+          Last-resort fallback. This is suitable for smaller files.
+          For very large files, the UI warns the user.
+        */
+        if (file.size > 200 * 1024 * 1024) {
+            fileWorker.terminate();
+            fileWorker = null;
+            processFileButton.disabled = false;
+            cancelFileButton.disabled = true;
+            progress.style.display = "none";
+
+            fileStatus.textContent =
+                "This browser does not provide OPFS in this page. " +
+                "For files over 200 MB, open the HTML directly in Chrome/Edge " +
+                "instead of the embedded preview.";
+            return;
+        }
+    }
+
+    let offset = 0;
+    let carry = "";
+    let records = 0;
+    let waiting = false;
+
+    const decoder = new TextDecoder("utf-8");
+
+    function updateProgress() {
+        const percent = file.size
+            ? Math.min(100, offset / file.size * 100)
+            : 100;
+
+        progress.value = percent;
+
+        const keyword =
+            (keepKeywordInput ? keepKeywordInput.value.trim() : "");
+
+        fileStatus.textContent =
+            "Processing " + file.name +
+            " — " + percent.toFixed(1) + "%" +
+            (keyword ? " — keeping lines containing any of: " + keyword : "");
+    }
+
+    async function sendNext() {
+        if (fileCancelled || waiting) return;
+
+        if (offset >= file.size) {
+            waiting = true;
+
+            fileWorker.postMessage({
+                text: carry,
+                finalChunk: true,
+                options: getV14Options()
+            });
+
+            carry = "";
+            return;
+        }
+
+        const end = Math.min(offset + CHUNK_SIZE, file.size);
+
+        const buffer = await file
+            .slice(offset, end)
+            .arrayBuffer();
+
+        const decoded = decoder.decode(
+            buffer,
+            {stream: end < file.size}
+        );
+
+        offset = end;
+
+        const combined = carry + decoded;
+        const lastNewline = combined.lastIndexOf("\n");
+
+        if (lastNewline < 0) {
+            carry = combined;
+            updateProgress();
+            await sendNext();
+            return;
+        }
+
+        const completeText =
+            combined.slice(0, lastNewline + 1);
+
+        carry =
+            combined.slice(lastNewline + 1);
+
+        waiting = true;
+
+        fileWorker.postMessage({
+            text: completeText,
+            finalChunk: false,
+            options: getV14Options()
+        });
+
+        updateProgress();
+    }
+
+    fileWorker.onerror = async function(error) {
+        fileCancelled = true;
+
+        try {
+            if (opfsWritable) await opfsWritable.abort();
+        } catch (_) {}
+
+        if (fileWorker) fileWorker.terminate();
+        fileWorker = null;
+
+        processFileButton.disabled = false;
+        cancelFileButton.disabled = true;
+
+        fileStatus.textContent =
+            "Worker error: " +
+            (error.message || "unknown error");
+    };
+
+    fileWorker.onmessage = async function(event) {
+        if (fileCancelled) return;
+
+        if (event.data.type === "error") {
+            fileCancelled = true;
+
+            try {
+                if (opfsWritable) await opfsWritable.abort();
+            } catch (_) {}
+
+            fileWorker.terminate();
+            fileWorker = null;
+
+            processFileButton.disabled = false;
+            cancelFileButton.disabled = true;
+
+            fileStatus.textContent =
+                "Processing error: " + event.data.message;
+            return;
+        }
+
+        if (event.data.type !== "result") return;
+
+        waiting = false;
+
+        if (event.data.text) {
+            const outputText = event.data.text + "\n";
+
+            if (opfsWritable) {
+                await opfsWritable.write(outputText);
+            } else {
+                fallbackParts.push(outputText);
+            }
+
+            records += event.data.text.split("\n").length;
+        }
+
+        if (event.data.finalChunk) {
+            try {
+                const outputSize = await finishV14Output();
+
+                progress.value = 100;
+
+                fileStatus.textContent =
+                    "✓ Completed — " +
+                    (outputSize / 1048576).toFixed(1) +
+                    " MB output — " +
+                    records.toLocaleString() +
+                    " records. Download is ready.";
+            } catch (error) {
+                fileStatus.textContent =
+                    "Could not create output: " +
+                    error.message;
+            }
+
+            processFileButton.disabled = false;
+            cancelFileButton.disabled = true;
+
+            fileWorker.terminate();
+            fileWorker = null;
+            return;
+        }
+
+        await sendNext();
+    };
+
+    try {
+        await sendNext();
+    } catch (error) {
+        try {
+            if (opfsWritable) await opfsWritable.abort();
+        } catch (_) {}
+
+        if (fileWorker) fileWorker.terminate();
+        fileWorker = null;
+
+        processFileButton.disabled = false;
+        cancelFileButton.disabled = true;
+
+        fileStatus.textContent =
+            "Error: " + error.message;
+    }
+}
+
+processFileButton.addEventListener("click", processLargeTXT);
+
+cancelFileButton.addEventListener("click", async function() {
+    fileCancelled = true;
+
+    if (fileWorker) {
+        fileWorker.terminate();
+        fileWorker = null;
+    }
+
+    try {
+        if (opfsWritable) await opfsWritable.abort();
+    } catch (_) {}
+
+    opfsWritable = null;
+
+    processFileButton.disabled = false;
+    cancelFileButton.disabled = true;
+    progress.style.display = "none";
+    fileStatus.textContent = "Cancelled.";
+});
+
+processText();
+</script>
+</body>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             </html>A selected symbol can remove an entire line (optional), or a separate field can remove only that exact symbol.<br><br>
 <b>Record rule</b><br>
 Blank lines are boundaries. A block containing 3 meaningful non-number lines becomes <code>A:B:C</code>.
 A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line. The optional first-field rule follows the exact Notepad++ pattern.<br><br>
