@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OCR Record Formatter V22</title>
+<link rel="icon" type="image/png" href="icon.png">
+
+<style>
+body{margin:0;background:#101216;color:#eee;font:14px Arial,sans-serif}
+.wrap{max-width:1250px;margin:auto;padding:22px}
+h1{margin:0 0 8px}.sub{color:#aeb7c4;line-height:1.5}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:#191d24;border:1px solid #303744;border-radius:14px;padding:15px}
+label{font-weight:700;display:block;margin-bottom:8px}
+textarea{width:100%;height:590px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;padding:13px;font:14px/1.5 Consolas,monospace}
+.row{display:flex;gap:9px;flex-wrap:wrap;margin-top:10px}
+button{border:0;border-radius:8px;padding:10px 14px;background:#2563eb;color:white;font-weight:bold;cursor:pointer}
+button.secondary{background:#4b5563}.danger{background:#b42318}
+.box{margin-top:15px;padding:13px;border:1px solid #303744;border-radius:10px;background:#151922;color:#cbd5e1;line-height:1.7;font-size:13px}
+.check{display:inline-flex;gap:6px;margin-right:18px;font-weight:normal}
+.status{margin-top:10px;color:#abb3bf}
+code{word-break:break-all}
+@media(max-width:850px){.grid{grid-template-columns:1fr}textarea{height:430px}}
+
+.switch-row{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:14px}
+.switch-row input{width:18px;height:18px}
+
+.custom-file-wrap{display:inline-flex;align-items:center}
+.custom-file-button{
+display:inline-flex;align-items:center;justify-content:center;gap:10px;
+min-height:44px;padding:8px 16px;border-radius:9px;cursor:pointer;
+font-weight:600;user-select:none;border:1px solid rgba(255,255,255,.16);
+background:#252a33;color:#fff;transition:transform .12s ease,background .12s ease;
+}
+.custom-file-button:hover{background:#303744}
+.custom-file-button:active{transform:scale(.98)}
+.custom-file-icon{width:30px;height:30px;object-fit:contain;display:block}
+
+.selected-file-name{
+margin-left:10px;
+max-width:320px;
+overflow:hidden;
+text-overflow:ellipsis;
+white-space:nowrap;
+opacity:.8;
+font-size:14px;
+}
+.download-btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;padding:10px 14px;border-radius:8px;background:#4b5563;color:#fff!important;font-weight:bold;text-decoration:none;cursor:pointer;border:0;transition:background .12s ease,transform .12s ease}.download-btn:hover{background:#5b6675}.download-btn:active{transform:scale(.98)}
+#keepKeywordHint{font-size:11px;opacity:.65;max-width:260px;line-height:1.25}</style>
+<style>#keepKeyword{padding:9px;border-radius:8px;border:1px solid #3b4350;background:#080a0e;color:#eee;min-width:260px}
+.custom-format-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.custom-format-grid input{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #3b4350;background:#080a0e;color:#eee;font:14px Consolas,monospace}
+.custom-format-help{font-size:11px;opacity:.7;line-height:1.45;margin-top:6px}
+@media(max-width:850px){.custom-format-grid{grid-template-columns:1fr}}
+</style></head>
+<body>
+<div class="wrap">
+<h1>OCR Record Formatter V24</h1>
+<p class="sub">Designed for messy OCR text: blank lines separate records, number-only OCR lines are removed, auth-style lines are recognized separately, and 2/3-line blocks are reconstructed without crossing record boundaries.</p>
+
+<div class="box" style="margin-bottom:16px"><b>
+Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is processed in chunks and the output is written to browser storage before download.<div class="row"><div class="custom-file-wrap">
+<input id="fileInput" type="file" accept=".txt,text/plain" hidden>
+<label for="fileInput" class="custom-file-button">
+<img src="uploads.png">
+  <span id="chooseFileText">Choose TXT File</span>
+</label>
+<span id="selectedFileName" class="selected-file-name">No file selected</span>
+</div><input id="keepKeyword" type="text" title="Enter multiple names separated by commas, semicolons, |, or new lines. A line is kept if it contains any name." placeholder="Keep lines containing: netflix, spotify, amazon"><span id="keepKeywordHint" class="keyword-hint">Leave blank to keep all lines. Separate multiple names with comma, ;, |, or new lines.</span><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" class="download-btn" style="display:none" download="formatted.txt">Download TXT</a></div><div class="grid">
+<div class="card">
+<label for="input">Input</label>
+<textarea id="input" spellcheck="false" placeholder="Paste OCR text here..."></textarea>
+
+<div class="box">
+<b>Automatic rules</b><br>
+<label class="check"><input id="removeNumbers" type="checkbox" checked> Remove number-only lines</label><br>
+<label class="check"><input id="removeDuplicates" type="checkbox"> Remove duplicate lines</label><br>
+<label class="check"><input id="authLines" type="checkbox" > Format auth/password/secret lines</label><br>
+<label class="check"><input id="threeLines" type="checkbox" > 3-line blocks → A:B:C</label><br>
+<label class="check"><input id="twoLines" type="checkbox" > 2-line blocks → A:B</label><br>
+<label class="check"><input id="stripFirstField" type="checkbox"> Remove first field (url:gmail:pass → gmail:pass)</label><br>
+<label class="check"><input id="removePunctuation" type="checkbox" > Remove ! ? - from lines</label><br>
+<label class="check"><input id="removeEmailSuffix" type="checkbox"> Remove @domain: part (abcd@___.___: → abcd:)</label><br>
+<label class="check"><input id="removeSymbolLines" type="checkbox"> Remove whole lines containing this symbol:
+<input id="lineRemoveSymbol" type="text" maxlength="10" placeholder="symbol" style="width:90px"></label><br>
+<label class="check">Remove this symbol only:
+<input id="singleRemoveSymbol" type="text" maxlength="1" placeholder="symbol" style="width:90px"></label><br>
+
+<div style="margin-top:14px;border-top:1px solid #303744;padding-top:12px">
+<label class="check"><input id="customFormatEnabled" type="checkbox"> Custom field converter</label>
+<div class="custom-format-grid">
+<div>
+<label for="customInputFormat">Input format</label>
+<input id="customInputFormat" type="text" spellcheck="false" placeholder="username:password:balance">
+</div>
+<div>
+<label for="customOutputFormat">Desired format</label>
+<input id="customOutputFormat" type="text" spellcheck="false" placeholder="username:password">
+</div>
+</div>
+<div class="custom-format-help">
+Enter field names, not actual values. Examples: <code>URL:id:gmail:username:password:balance</code> → <code>username:password</code>, or <code>username password balance</code> → <code>username:balance</code>. The separator is taken from the format you enter.
+</div>
+</div>
+</div>
+
+<div class="row">
+<button id="process">Process</button>
+<button class="secondary" id="sample">Load test</button>
+<button class="danger" id="clear">Clear</button>
+</div>
+</div>
+
+<div class="card">
+<label for="output">Output</label>
+<textarea id="output" readonly spellcheck="false"></textarea>
+<div class="row">
+<button id="copy">Copy</button>
+<button class="secondary" id="download">Download TXT</button>
+</div>
+<div class="status" id="status">Ready.</div>
+</div>
+</div>
+
+<div class="box">
+<b>Supported auth formats</b><br>
+<code>auth login: USER password: PASS secret: SECRET</code><br>
+<code>USER password: PASS secret: SECRET</code><br>
+Both become <code>USER:PASS:SECRET</code>.
+<br><br>
+<b>Additional cleanup rules</b><br>Multiple keep names: enter them separated by commas, semicolons, |, or new lines. A line is kept when it contains <b>any</b> of them (OR matching).<br>
+<code>@[^:]+:\s*</code> → <code>:</code> (optional)<br>
+<code>\h*:\h*</code> → <code>:</code> (always on)<br>
+A selected symbol can remove an entire line (optional), or a separate field can remove only that exact symbol.<br><br>
+<b>Record rule</b><br>
+Blank lines are boundaries. A block containing 3 meaningful non-number lines becomes <code>A:B:C</code>.
+A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line. The optional first-field rule follows the exact Notepad++ pattern.<br>
+<b>How to Use?</b><br>
+
+1. Remove number-only lines: To remove a line in which there is only numbers.<br>
+
+2. Format auth/password/secret lines: If text lines are in this format 》<br>
+auth login: RaAxrThz password: F0e8T5Y3Uy secret: A43OG6axHA5H4Tu1 <br>
+then it changed it into 》 RaAxrThz:F0e8T5Y3Uy:A43OG6axHA5H4Tu1<br>
+
+3. 3-line blocks -> A:B:C : If user,pass,secret in this form 》<br>
+v1sd2ow4 <br>
+3z1x4JY4EE <br>
+Ws5bwYpk8x7P85YB<br>
+Then this changed in this form 》 v1sd2ow4:3z1x4JY4EE:Ws5bwYpk8x7P85YB<br>
+
+4. 2-line blocks >A:B : Same as 3-line blocks but in it there is only user:pass.<br>
+
+5. Remove first field (url:gmail:pass -> gmail:pass) : This will remove url from line and user:pass remains.<br>
+
+6. Remove @domain: part (abcd@__
+.__ ---> abcd:) : If there is an @gmail.com or @yahoo.com or other no matter what will removed from the lines.<br>
+
+7. Remove whole lines containing this symbol:
+If you want to remove a line which contain an specific line then enter that symbol in box and it will remove whole line.<br>
+
+8. Remove this symbol only: If you want to remove a specific symbol from whole text file enter that symbol in box.<br>
+
+Note: Don't forget to uncheck the box if you don't want to use any function. <br>
+Use file upload for large files and for Thousand or Million lines. If less lines use paste text.
+</div>
+</div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const input=$("input"),output=$("output"),status=$("status");
+function normalizeNewlines(t){return String(t??"").replace(/\r\n?/g,"\n")}
+function isBlank(s){return /^[ \t]*$/.test(s)}
+function isNumberOnly(s){return /^[ \t]*\d+(?:\.\d+)?[ \t]*$/.test(s)}
+function removeTxn(s){return s.replace(/\s+\d+(?:\.\d+)?\s+txn\s+\d+\s*$/i,"")}
+function removePunct(s){return s.replace(/[!?-]/g,"")}
+function removeEmail(s){return s.replace(/@[^:]+:\s*/g,":")}
+function normColon(s){return s.replace(/[ \t]*:[ \t]*/g,":")}
+function keywords(v){return String(v||"").split(/[,;|\n]+/).map(x=>x.trim()).filter(Boolean)}
+function keep(line,ks,cs){if(!ks.length)return true;const h=cs?line:line.toLowerCase();return ks.some(k=>h.includes(cs?k:k.toLowerCase()))}
+function parts(f){const v=String(f||"").trim();if(!v)return{names:[],d:null};if(v.includes(":"))return{names:v.split(":").map(x=>x.trim()).filter(Boolean),d:":"};if(v.includes("|"))return{names:v.split("|").map(x=>x.trim()).filter(Boolean),d:"|"};return{names:v.split(/\s+/).filter(Boolean),d:" "}}
+function custom(line,inf,outf){const a=parts(inf),b=parts(outf);if(!a.names.length||!b.names.length)return null;let f=a.d===":"?line.split(":").map(x=>x.trim()):a.d==="|"?line.split("|").map(x=>x.trim()):line.trim().split(/\s+/);if(a.d===":"&&f.length>a.names.length){const ui=a.names.findIndex(n=>/^(url|uri|website)$/i.test(n));if(ui>=0)while(f.length>a.names.length){f[ui]+=":"+f[ui+1];f.splice(ui+1,1)}}if(f.length!==a.names.length)return null;const m=Object.create(null);a.names.forEach((n,i)=>m[n.toLowerCase()]=f[i]);const vals=[];for(const n of b.names){const k=n.toLowerCase();if(!(k in m))return null;vals.push(m[k])}return vals.join(b.d)}
+function auth(line){let m=line.match(/\blogin:\s*(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i);if(m)return m.slice(1).join(":");m=line.match(/^(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i);return m?m.slice(1).join(":"):null}
+function stripFirst(s){const m=s.match(/^[^:]+:(.+:.+)$/);return m?m[1]:s}
+function opts(){return{removeDuplicates:$("removeDuplicates").checked,removeNumbers:$("removeNumbers").checked,authLines:$("authLines").checked,threeLines:$("threeLines").checked,twoLines:$("twoLines").checked,stripFirstField:$("stripFirstField").checked,removePunctuation:$("removePunctuation").checked,removeEmailSuffix:$("removeEmailSuffix").checked,removeSymbolLines:$("removeSymbolLines").checked,lineRemoveSymbol:$("lineRemoveSymbol").value,singleRemoveSymbol:$("singleRemoveSymbol").value,keyword:$("keepKeyword").value,caseSensitive:$("keepCase").checked,customFormatEnabled:$("customFormatEnabled").checked,customInputFormat:$("customInputFormat").value,customOutputFormat:$("customOutputFormat").value}}
+function processBlock(raw,o){let lines=raw.map(x=>x.trim()).filter(Boolean);if(o.removeNumbers)lines=lines.filter(x=>!isNumberOnly(x));const out=[],buf=[];function flush(){if(!buf.length)return;const a=buf.splice(0);if(a.length===3&&o.threeLines)out.push(a.join(":"));else if(a.length===2&&o.twoLines)out.push(a.join(":"));else out.push(...a)}for(let line of lines){line=removeTxn(line).trim();if(o.removeSymbolLines&&o.lineRemoveSymbol&&line.includes(o.lineRemoveSymbol))continue;if(o.singleRemoveSymbol)line=line.split(o.singleRemoveSymbol).join("");if(o.removePunctuation)line=removePunct(line);line=normColon(line);if(o.removeEmailSuffix)line=removeEmail(line);line=line.trim();if(!line)continue;if(o.authLines){const a=auth(line);if(a!==null){flush();out.push(a);continue}}if(o.customFormatEnabled){const c=custom(line,o.customInputFormat,o.customOutputFormat);if(c!==null){flush();out.push(c);continue}}if(o.stripFirstField&&line.includes(":"))line=stripFirst(line);if(line.includes(":")){flush();out.push(line)}else buf.push(line)}flush();const ks=keywords(o.keyword);return ks.length?out.filter(x=>keep(x,ks,o.caseSensitive)):out}
+function processText(){try{const o=opts(),text=normalizeNewlines(input.value||"");if(!text.trim()){output.value="";status.textContent="Paste text into the Input box first.";return}const blocks=[];let cur=[];for(const l of text.split("\n")){if(isBlank(l)){if(cur.length){blocks.push(cur);cur=[]}}else cur.push(l)}if(cur.length)blocks.push(cur);let out=blocks.flatMap(b=>processBlock(b,o));if(o.removeDuplicates){const seen=new Set();out=out.filter(x=>{const k=x.trim();if(!k)return true;if(seen.has(k))return false;seen.add(k);return true})}output.value=out.join("\n");const ks=keywords(o.keyword);status.textContent=`${out.length.toLocaleString()} output line(s) generated from ${blocks.length.toLocaleString()} record block(s)${ks.length?` — ${ks.length} keep-name filter(s) active.`:"."}` }catch(e){output.value="";status.textContent="Processing error: "+(e.message||e);console.error(e)}}
+input.addEventListener("input",processText);$("process").addEventListener("click",processText);$("clear").addEventListener("click",()=>{input.value="";output.value="";status.textContent="Cleared.";input.focus()});
+$("copy").addEventListener("click",async()=>{if(!output.value){status.textContent="Nothing to copy.";return}try{await navigator.clipboard.writeText(output.value)}catch{output.select();document.execCommand("copy")}status.textContent="Copied to clipboard."});
+$("download").addEventListener("click",()=>{if(!output.value){status.textContent="Nothing to download.";return}const u=URL.createObjectURL(new Blob([output.value],{type:"text/plain;charset=utf-8"})),a=document.createElement("a");a.href=u;a.download="formatted.txt";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);status.textContent="Downloaded formatted.txt."});
+$("sample").addEventListener("click",()=>{input.value=`auth login: wvu7P4Qp password: JWMI51vVTT secret: X7ay025ISQSbc7Zo\n\n7PHT62t4\nVh27JgoPJn\nsCt8FLnzW0OZvJqK\n0\n\nauth login: ZeMTL9dx password: hJ0tnEvgkE secret: wn7MiogCCc6Zp7a3\n\n7PHT62t4\nsoe3Re9l\ncwScO6L2OC\n\nWDpVp2HO\nefCIATYWml\nmseS3RcyIpxClglN\n3\n\nBsnLx1sm\nsbsjmK6spP\nAgDF7i9wqHka6Acx\n\nMHTsyNCO\nkLRBghkiIP\nbHPhL5xvOuOIQHbf`;processText()});
+const fileInput=$("fileInput"),selectedFileName=$("selectedFileName"),processFileButton=$("processFile"),cancelFileButton=$("cancelFile"),fileStatus=$("fileStatus"),progress=$("progress"),downloadFile=$("downloadFile");let worker=null,cancelled=false,writable=null,handle=null,fallback=[];
+fileInput.addEventListener("change",function(){if(this.files?.length){selectedFileName.textContent=this.files[0].name;selectedFileName.title=this.files[0].name;$("chooseFileText").textContent="File selected";fileStatus.textContent="Selected: "+this.files[0].name}else{selectedFileName.textContent="No file selected";selectedFileName.title="";$("chooseFileText").textContent="Choose TXT File";fileStatus.textContent="No file selected."}});
+const WORKER=String.raw`"use strict";let block=[];const blank=s=>/^[ \\t]*$/.test(s),num=s=>/^[ \\t]*\\d+(?:\\.\\d+)?[ \\t]*$/.test(s);function txn(s){return s.replace(/\\s+\\d+(?:\\.\\d+)?\\s+txn\\s+\\d+\\s*$/i,"")}function punct(s){return s.replace(/[!?-]/g,"")}function email(s){return s.replace(/@[^:]+:\\s*/g,":")}function colon(s){return s.replace(/[ \\t]*:[ \\t]*/g,":")}function ks(v){return String(v||"").split(/[,;|\\n]+/).map(x=>x.trim()).filter(Boolean)}function keep(l,k,c){if(!k.length)return true;let h=c?l:l.toLowerCase();return k.some(x=>h.includes(c?x:x.toLowerCase()))}function fmt(l){let m=l.match(/\\blogin:\\s*(\\S+)\\s+password:\\s*(\\S+)\\s+secret:\\s*(\\S+)\\s*$/i);if(m)return m.slice(1).join(":");m=l.match(/^(\\S+)\\s+password:\\s*(\\S+)\\s+secret:\\s*(\\S+)\\s*$/i);return m?m.slice(1).join(":"):null}function custom(l,inf,outf){let a=String(inf||"").trim(),b=String(outf||"").trim();if(!a||!b)return null;let ad=a.includes(":")?":":a.includes("|")?"|":" ",bd=b.includes(":")?":":b.includes("|")?"|":" ";let an=a.split(ad).map(x=>x.trim()).filter(Boolean),bn=b.split(bd).map(x=>x.trim()).filter(Boolean),f=ad===":"?l.split(":"):ad==="|"?l.split("|"):l.trim().split(/\\s+/);let ui=an.findIndex(x=>/^(url|uri|website)$/i.test(x));if(ad===":"&&ui>=0)while(f.length>an.length){f[ui]+=":"+f[ui+1];f.splice(ui+1,1)}if(f.length!==an.length)return null;let m=Object.create(null);an.forEach((x,i)=>m[x.toLowerCase()]=f[i].trim());let v=[];for(let x of bn){let k=x.toLowerCase();if(!(k in m))return null;v.push(m[k])}return v.join(bd)}function blockOut(raw,o){let lines=raw.map(x=>x.trim()).filter(Boolean);if(o.removeNumbers)lines=lines.filter(x=>!num(x));let out=[],buf=[];function flush(){if(!buf.length)return;let a=buf.splice(0);if(a.length===3&&o.threeLines)out.push(a.join(":"));else if(a.length===2&&o.twoLines)out.push(a.join(":"));else out.push(...a)}for(let l of lines){l=txn(l).trim();if(o.removeSymbolLines&&o.lineRemoveSymbol&&l.includes(o.lineRemoveSymbol))continue;if(o.singleRemoveSymbol)l=l.split(o.singleRemoveSymbol).join("");if(o.removePunctuation)l=punct(l);l=colon(l);if(o.removeEmailSuffix)l=email(l);l=l.trim();if(!l)continue;if(o.authLines){let a=fmt(l);if(a!==null){flush();out.push(a);continue}}if(o.stripFirstField&&l.includes(":")){let m=l.match(/^[^:]+:(.+:.+)$/);if(m)l=m[1]}if(o.customFormatEnabled){let c=custom(l,o.customInputFormat,o.customOutputFormat);if(c!==null){flush();out.push(c);continue}}if(l.includes(":")){flush();out.push(l)}else buf.push(l)}flush();let k=ks(o.keyword);return k.length?out.filter(x=>keep(x,k,o.caseSensitive)):out}function flush(o){if(!block.length)return"";let b=block;block=[];return blockOut(b,o).join("\\n")}let seenLines=new Set();self.onmessage=e=>{try{let d=e.data,lines=String(d.text||"").replace(/\\r\\n?/g,"\\n").split("\\n"),r=[];for(let l of lines){if(blank(l)){let x=flush(d.options);if(x)r.push(x)}else block.push(l)}if(d.finalChunk){let x=flush(d.options);if(x)r.push(x)}let text=r.join("\\n");if(d.options.removeDuplicates){let a=[];for(let line of text.split("\\n")){let k=line.trim();if(!k||!seenLines.has(k)){if(k)seenLines.add(k);a.push(line)}}text=a.join("\\n")}self.postMessage({type:"result",finalChunk:!!d.finalChunk,text:text})}catch(x){self.postMessage({type:"error",message:x.stack||String(x)})}};`;
+function fileOpts(){return opts()}
+function makeWorker(){return new Worker(URL.createObjectURL(new Blob([WORKER],{type:"application/javascript"})))}
+async function openOut(){if(!navigator.storage?.getDirectory)return false;const root=await navigator.storage.getDirectory();handle=await root.getFileHandle("formatted_"+Date.now()+".txt",{create:true});writable=await handle.createWritable();return true}
+async function finishOut(){if(writable){await writable.close();writable=null;const f=await handle.getFile(),u=URL.createObjectURL(f);if(downloadFile.dataset.url)URL.revokeObjectURL(downloadFile.dataset.url);downloadFile.href=u;downloadFile.dataset.url=u;downloadFile.download="formatted.txt";downloadFile.textContent=`Download TXT (${(f.size/1048576).toFixed(1)} MB)`;downloadFile.style.display="inline-flex";return f.size}const b=new Blob(fallback,{type:"text/plain;charset=utf-8"}),u=URL.createObjectURL(b);if(downloadFile.dataset.url)URL.revokeObjectURL(downloadFile.dataset.url);downloadFile.href=u;downloadFile.dataset.url=u;downloadFile.download="formatted.txt";downloadFile.textContent=`Download TXT (${(b.size/1048576).toFixed(1)} MB)`;downloadFile.style.display="inline-flex";fallback=[];return b.size}
+async function processLarge(){if(!fileInput.files?.length){fileStatus.textContent="Please select a TXT file first.";return}const file=fileInput.files[0],CHUNK=4*1024*1024;cancelled=false;fallback=[];writable=null;handle=null;worker?.terminate();worker=makeWorker();processFileButton.disabled=true;cancelFileButton.disabled=false;progress.style.display="block";progress.value=0;downloadFile.style.display="none";let opfs=false;try{opfs=await openOut()}catch{}if(!opfs&&file.size>200*1024*1024){worker.terminate();worker=null;processFileButton.disabled=false;cancelFileButton.disabled=true;progress.style.display="none";fileStatus.textContent="OPFS is unavailable here. For files over 200 MB, open this HTML directly in Chrome/Edge.";return}let off=0,carry="",waiting=false,count=0,dec=new TextDecoder("utf-8");const send=async()=>{if(cancelled||waiting)return;if(off>=file.size){waiting=true;worker.postMessage({text:carry,finalChunk:true,options:fileOpts()});carry="";return}const end=Math.min(off+CHUNK,file.size),buf=await file.slice(off,end).arrayBuffer(),txt=dec.decode(buf,{stream:end<file.size});off=end;const combined=carry+txt,idx=combined.lastIndexOf("\\n");if(idx<0){carry=combined;await send();return}worker.postMessage({text:combined.slice(0,idx+1),finalChunk:false,options:fileOpts()});carry=combined.slice(idx+1);waiting=true;progress.value=file.size?off/file.size*100:100;fileStatus.textContent=`Processing ${file.name} — ${progress.value.toFixed(1)}%`};worker.onmessage=async e=>{if(cancelled)return;if(e.data.type==="error"){cancelled=true;try{await writable?.abort()}catch{}worker.terminate();worker=null;processFileButton.disabled=false;cancelFileButton.disabled=true;fileStatus.textContent="Processing error: "+e.data.message;return}waiting=false;if(e.data.text){const t=e.data.text+"\\n";if(writable)await writable.write(t);else fallback.push(t);count+=e.data.text.split("\\n").length}if(e.data.finalChunk){try{const size=await finishOut();progress.value=100;fileStatus.textContent=`✓ Completed — ${(size/1048576).toFixed(1)} MB output — ${count.toLocaleString()} records. Download is ready.`}catch(x){fileStatus.textContent="Could not create output: "+x.message}processFileButton.disabled=false;cancelFileButton.disabled=true;worker.terminate();worker=null;return}await send()};worker.onerror=e=>{cancelled=true;worker?.terminate();worker=null;processFileButton.disabled=false;cancelFileButton.disabled=true;fileStatus.textContent="Worker error: "+(e.message||"unknown error")};try{await send()}catch(e){worker?.terminate();worker=null;processFileButton.disabled=false;cancelFileButton.disabled=true;fileStatus.textContent="Error: "+e.message}}
+processFileButton.addEventListener("click",processLarge);cancelFileButton.addEventListener("click",async()=>{cancelled=true;worker?.terminate();worker=null;try{await writable?.abort()}catch{}writable=null;processFileButton.disabled=false;cancelFileButton.disabled=true;progress.style.display="none";fileStatus.textContent="Cancelled."});
+processText();
+</script>
+</body>
+</html>
