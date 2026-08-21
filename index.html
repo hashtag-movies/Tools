@@ -67,7 +67,7 @@ Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is pro
   <span id="chooseFileText">Choose TXT File</span>
 </label>
 <span id="selectedFileName" class="selected-file-name">No file selected</span>
-</div><input id="keepKeyword" type="text" title="Enter multiple names separated by commas, semicolons, |, or new lines. A line is kept if it contains any name." placeholder="Keep lines containing: netflix, spotify, amazon"><span id="keepKeywordHint" class="keyword-hint">Leave blank to keep all lines. Separate multiple names with comma, ;, |, or new lines.</span><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" class="download-btn" style="display:none" download="formatted.txt">Download TXT</a></div><div class="grid">
+</div><input id="keepKeyword" type="text" title="Enter multiple names separated by commas, semicolons, |, or new lines. A line is kept if it contains any name." placeholder="Keep lines containing: netflix, spotify, amazon"><span id="keepKeywordHint" class="keyword-hint">Leave blank to keep all lines. Separate multiple names with comma, ;, |, or new lines.</span><label class="check" style="align-self:center"><input id="keepCase" type="checkbox"> Case-sensitive</label><button id="processFile" style="height:50px;">Process TXT File</button><button class="secondary" id="cancelFile" disabled>Cancel</button></div><div class="status" id="fileStatus">No file selected.</div><progress id="progress" value="0" max="100" style="width:100%;margin-top:8px;display:none"></progress><a id="downloadFile" class="download-btn" style="display:none" download="formatted.txt">Download TXT</a></div><div class="grid">
 <div class="card">
 <label for="input">Input</label>
 <textarea id="input" spellcheck="false" placeholder="Paste OCR text here..."></textarea>
@@ -135,7 +135,7 @@ Both become <code>USER:PASS:SECRET</code>.
 A selected symbol can remove an entire line (optional), or a separate field can remove only that exact symbol.<br><br>
 <b>Record rule</b><br>
 Blank lines are boundaries. A block containing 3 meaningful non-number lines becomes <code>A:B:C</code>.
-A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line. The optional first-field rule follows the exact Notepad++ pattern.<br>
+A block containing 2 becomes <code>A:B</code>. A single line is preserved. The parser never borrows a line from the next blank-line-separated record. Transaction suffixes are removed automatically, and ! ? - are removed automatically from every line. The optional first-field rule follows the exact Notepad++ pattern.<br><br>
 <b>How to Use?</b><br>
 
 1. Remove number-only lines: To remove a line in which there is only numbers.<br>
