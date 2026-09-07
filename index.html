@@ -190,15 +190,15 @@ font-size:14px;
 <b>Automatic rules</b><br>
 <label class="check"><input id="removeNumbers" type="checkbox" checked> Remove number-only lines</label><br><label class="check"><input id="removeDuplicates" type="checkbox" checked> Remove duplicate lines</label><br>
 <label class="check"><input id="authLines" type="checkbox" > Format auth/password/secret lines</label><br>
-<label class="check"><input id="threeLines" type="checkbox" > <span>Custom-size blocks → A:B:C:...</span> <input id="threeBlockSize" type="number" min="1" max="1000" value="3" style="width:58px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;font:14px/1.5 Consolas,monospace" title="Number of lines in the block"></label><br>
-<label class="check"><input id="twoLines" type="checkbox" > <span>Second block size → A:B:...</span> <input id="twoBlockSize" type="number" min="1" max="1000" value="2" style="width:58px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;font:14px/1.5 Consolas,monospace" title="Number of lines in the block"></label><br>
+<label class="check"><input id="threeLines" type="checkbox" > <span>Custom-size blocks → A:B:C:...</span> <input id="threeBlockSize" type="number" min="1" max="1000" value="3" style="width:50px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;font:14px/1.5 Consolas,monospace" title="Number of lines in the block"></label><br>
+<label class="check"><input id="twoLines" type="checkbox" > <span>Second block size → A:B:...</span> <input id="twoBlockSize" type="number" min="1" max="1000" value="2" style="width:50px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;font:14px/1.5 Consolas,monospace" title="Number of lines in the block"></label><br>
 <label class="check"><input id="stripFirstField" type="checkbox"> Remove first field (url:gmail:pass → gmail:pass)</label><br>
 <label class="check"><input id="removePunctuation" type="checkbox" > Remove ! ? - from lines</label><br>
 <label class="check"><input id="removeEmailSuffix" type="checkbox"> Remove @domain: part (abcd@___.___: → abcd:)</label><br>
 <label class="check"><input id="removeSymbolLines" type="checkbox"> Remove whole lines containing this symbol:
-<input id="lineRemoveSymbol" type="text" maxlength="10" placeholder="symbol" style="width:90px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;font:14px/1.5 Consolas,monospace"></label><br>
+<input id="lineRemoveSymbol" type="text" maxlength="4" placeholder="symbol" style="width:50px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;font:14px/1.5 Consolas,monospace"></label><br>
 <label class="check">Remove this symbol only:
-<input id="singleRemoveSymbol" type="text" maxlength="1" placeholder="symbol" style="width:90px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;font:14px/1.5 Consolas,monospace"></label><br>
+<input id="singleRemoveSymbol" type="text" maxlength="1" placeholder="symbol" style="width:50px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;font:14px/1.5 Consolas,monospace"></label><br>
 
 <div style="margin-top:14px;border-top:1px solid #303744;padding-top:12px">
 <label class="check"><input id="customFormatEnabled" type="checkbox"> Custom field converter</label>
