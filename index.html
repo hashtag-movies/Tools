@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OCR Record Formatter V22</title>
+<title>OCR Record Formatter V29 — Hashtag AI</title>
 <link rel="icon" type="image/png" href="icon.png">
 
 <style>
@@ -53,11 +53,27 @@ font-size:14px;
 .custom-format-grid input{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #3b4350;background:#080a0e;color:#eee;font:14px Consolas,monospace}
 .custom-format-help{font-size:11px;opacity:.7;line-height:1.45;margin-top:6px}
 @media(max-width:850px){.custom-format-grid{grid-template-columns:1fr}}
+
+.hashtag-card{margin:15px 0;background:linear-gradient(135deg,#151922,#11151c);border:1px solid #303744;border-radius:14px;padding:15px;box-shadow:0 8px 30px rgba(0,0,0,.18)}
+.hashtag-title{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:700;margin-bottom:5px}.hashtag-logo{width:30px;height:30px;border-radius:9px;background:#2563eb;display:grid;place-items:center;font-weight:900;color:#fff}.hashtag-sub{color:#9da7b5;font-size:12px;line-height:1.45;margin-bottom:10px}.hashtag-input{width:100%;min-height:78px;box-sizing:border-box;resize:vertical;background:#080a0e;color:#eee;border:1px solid #3b4350;border-radius:10px;padding:11px;font:14px/1.45 Consolas,monospace}.hashtag-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.hashtag-result{margin-top:10px;padding:10px 12px;border-radius:9px;background:#0c1016;border:1px solid #303744;color:#cbd5e1;font-size:12px;line-height:1.55;display:none}.hashtag-result b{color:#fff}.hashtag-chip{display:inline-block;padding:2px 7px;border:1px solid #3b4350;border-radius:999px;margin:2px 4px 2px 0;background:#171c25}.hashtag-note{font-size:11px;color:#8993a2;margin-top:7px}
 </style></head>
 <body>
 <div class="wrap">
-<h1>OCR Record Formatter V24</h1>
-<p class="sub">Designed for messy OCR text: blank lines separate records, number-only OCR lines are removed, auth-style lines are recognized separately, and 2/3-line blocks are reconstructed without crossing record boundaries.</p>
+<h1>OCR Record Formatter V29 <span style="font-size:.55em;opacity:.75">+ Hashtag AI</span></h1>
+<p class="sub">Designed for messy OCR text: blank lines separate records, number-only OCR lines are removed, auth-style lines are recognized separately, and configurable blocks are reconstructed without crossing record boundaries.</p>
+
+<div class="hashtag-card">
+  <div class="hashtag-title"><span class="hashtag-logo">#</span> Hashtag AI</div>
+  <div class="hashtag-sub">Tell Hashtag what you want to do in normal language. It will configure the formatter for you. Manual controls remain available below.</div>
+  <textarea id="hashtagInput" class="hashtag-input" spellcheck="false" placeholder="Example: Remove duplicate lines, remove lvl markers, take every 5 lines and join them with :, and convert auth records to username:password:secret."></textarea>
+  <div class="hashtag-actions">
+    <button id="hashtagAsk">✨ Ask Hashtag</button>
+    <button id="hashtagApply" class="secondary">⚡ Apply &amp; Process</button>
+    <button id="hashtagClear" class="secondary">Clear</button>
+  </div>
+  <div id="hashtagResult" class="hashtag-result"></div>
+  <div class="hashtag-note">Hashtag V1 runs locally in this HTML — no API key is required. It translates common instructions into the formatter's existing settings.</div>
+</div>
 
 <div class="box" style="margin-bottom:16px"><b>
 Large TXT file mode</b><br>For millions of lines, choose the TXT file. It is processed in chunks and the output is written to browser storage before download.<div class="row"><div class="custom-file-wrap">
@@ -123,7 +139,7 @@ Enter field names, not actual values. Examples: <code>URL:id:gmail:username:pass
 </div>
 
 <div class="box">
-<b>Supported auth formats</b><br>
+<b>Supported auth formats + Hashtag AI</b><br>
 <code>auth login: USER password: PASS secret: SECRET</code><br>
 <code>USER password: PASS secret: SECRET</code><br>
 Both become <code>USER:PASS:SECRET</code>.
@@ -185,6 +201,61 @@ function custom(line,inf,outf){const a=parts(inf),b=parts(outf);if(!a.names.leng
 function customLabeledBlock(lines,inf,outf){const b=parts(outf);if(!b.names.length||!lines.length)return null;const m=Object.create(null);let hit=false;const patterns=[[/\b(?:usr|user|username|login)\s*:\s*([^\s]+)/i,"username"],[/\b(?:pass|password|pwd)\s*:\s*([^\s]+)/i,"password"],[/\bsecret\s*:\s*([^\s]+)/i,"secret"]];for(const raw of lines){const line=String(raw||"").trim();if(!line)continue;for(const [re,key] of patterns){if(m[key])continue;const x=line.match(re);if(x){m[key]=x[1].trim();hit=true}}if(hit&&m.username&&m.password&&m.secret)break}if(!hit)return null;const canonical=k=>/^(usr|user|username|login)$/i.test(k)?"username":/^(pass|password|pwd)$/i.test(k)?"password":k.toLowerCase();for(const n of b.names){const k=canonical(n);if(!(k in m))return null}return b.names.map(n=>m[canonical(n)]).join(b.d)}
 function auth(line){let m=line.match(/\blogin:\s*(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i);if(m)return m.slice(1).join(":");m=line.match(/^(\S+)\s+password:\s*(\S+)\s+secret:\s*(\S+)\s*$/i);return m?m.slice(1).join(":"):null}
 function stripFirst(s){const m=s.match(/^[^:]+:(.+:.+)$/);return m?m[1]:s}
+function hashtagSet(id,v){const e=$(id);if(e)e.checked=!!v}
+function hashtagReset(){['removeDuplicates','removeNumbers','authLines','threeLines','twoLines','stripFirstField','removePunctuation','removeEmailSuffix','removeSymbolLines','customFormatEnabled'].forEach(id=>hashtagSet(id,false));$('keepKeyword').value='';$('lineRemoveSymbol').value='';$('singleRemoveSymbol').value='';$('customInputFormat').value='';$('customOutputFormat').value='';$('threeBlockSize').value='3';$('twoBlockSize').value='2'}
+function hashtagParse(cmd){
+  const t=String(cmd||'').trim(), l=t.toLowerCase(); if(!t)return{ok:false,items:[],message:'Tell Hashtag what you want to convert.'};
+  hashtagReset(); const items=[];
+  const add=(id,label)=>{hashtagSet(id,true);items.push(label)};
+  if(/\b(duplicate|duplicates|repeated)\b/.test(l) && /\b(remove|delete|dedupe|deduplicate)\b/.test(l))add('removeDuplicates','Remove duplicate lines');
+  if(/\b(number[- ]only|number only|standalone number|numbers only)\b/.test(l) && /\b(remove|delete|strip)\b/.test(l))add('removeNumbers','Remove number-only lines');
+  if(/\b(lvl|level)\b/.test(l) && /\b(remove|delete|strip|clean)\b/.test(l))items.push('Remove lvl markers automatically');
+  if(/\b(auth|username.*password.*secret|usr.*pass.*secret)\b/.test(l) && /\b(auth|username|usr|password|pass|secret)\b/.test(l)){add('authLines','Format auth/password/secret records')}
+  if(/\b(punctuation|!|\?|dash|hyphen)\b/.test(l) && /\b(remove|delete|strip)\b/.test(l))add('removePunctuation','Remove ! ? - punctuation');
+  if(/\b(email|domain)\b/.test(l) && /\b(remove|strip|delete)\b/.test(l) && /@/.test(l))add('removeEmailSuffix','Remove @domain: suffix');
+  if(/\b(first field|first column|url)\b/.test(l) && /\b(remove|strip|drop)\b/.test(l))add('stripFirstField','Remove first field');
+  const nums=[...l.matchAll(/(?:every|each|per|in|of|take)\s*(\d+)\s*[- ]?\s*lines?\b/g)].map(m=>+m[1]);
+  const nums2=[...l.matchAll(/\b(\d+)\s*[- ]?\s*line\s*(?:blocks?|records?)\b/g)].map(m=>+m[1]);
+  const sizes=[...new Set([...nums,...nums2].filter(n=>n>=1&&n<=1000))];
+  if(sizes.length){
+    if(sizes.length===1){hashtagSet('threeLines',true);$('threeBlockSize').value=sizes[0];items.push(`Block size: ${sizes[0]} lines`)}
+    else {hashtagSet('threeLines',true);hashtagSet('twoLines',true);$('threeBlockSize').value=sizes[0];$('twoBlockSize').value=sizes[1];items.push(`Block sizes: ${sizes[0]} and ${sizes[1]} lines`)}
+  }
+  if(/\bkeep\b|\bonly\b/.test(l) && /\b(lines?|records?|containing)\b/.test(l)){
+    const km=t.match(/(?:containing|with|named|names?)\s*[:=]?\s*([^.!?\n]+)/i);
+    if(km){let raw=km[1].replace(/\b(and|then|also)\b/gi,',').replace(/\s*,\s*/g,',').trim();if(raw){$('keepKeyword').value=raw;items.push('Keep-only keyword filter')}}
+  }
+  const hasAuthShape=/\b(usr|user|username)\s*[:=]|\b(pass|password|pwd)\s*[:=]|\bsecret\s*[:=]/i.test(t);
+  const wantsSecret=/\b(secret)\b/.test(l);
+  const wantsUser=/\b(username|user|usr|login)\b/.test(l);
+  const wantsPass=/\b(password|pass|pwd)\b/.test(l);
+  if(hasAuthShape || /\bauth\b/.test(l)){
+    hashtagSet('customFormatEnabled',true);$('customInputFormat').value='usr:USER pass:PASS type:auth secret:SECRET';
+    let fields=[];if(wantsUser||/\busername:password:secret\b/.test(l))fields.push('username');if(wantsPass||/\busername:password\b/.test(l))fields.push('password');if(wantsSecret||/\busername:password:secret\b/.test(l))fields.push('secret');
+    if(!fields.length)fields=['username','password','secret'];
+    // Prefer explicit requested order when a colon format is present.
+    const fm=t.match(/\b(username|user|usr|password|pass|secret)(?:\s*:\s*|\s+)(username|user|usr|password|pass|secret)(?:\s*:\s*|\s+)(username|user|usr|password|pass|secret)\b/i);
+    if(fm)fields=fm.slice(1).map(x=>/^(user|usr)$/i.test(x)?'username':/^(pass)$/i.test(x)?'password':x.toLowerCase());
+    $('customOutputFormat').value=fields.join(':');items.push(`Custom auth output: ${$('customOutputFormat').value}`);
+  }
+  const explicitFormat=t.match(/(?:into|to|as|output)\s+(?:the\s+)?(?:format\s+)?([a-z][a-z0-9_]*(?:\s*[:|]\s*[a-z][a-z0-9_]*){1,10})/i);
+  if(explicitFormat && !hasAuthShape){
+    const fmt=explicitFormat[1].replace(/\s+/g,'');$('customFormatEnabled').checked=true;$('customOutputFormat').value=fmt;items.push(`Desired format: ${fmt}`);
+  }
+  const sep= /\b(?:join|separate|delimiter|separator)\b[^\n]*\b(colon|:)\b/i.test(t) ? ':' : null;
+  if(sep && sizes.length && !$('customFormatEnabled').checked)items.push('Join block fields with :');
+  if(/\bremove\s+lines?\b/i.test(t)&&/symbol/i.test(t)){
+    const sm=t.match(/symbol\s*[:=]?\s*([\S])/i);if(sm){add('removeSymbolLines','Remove lines containing '+sm[1]);$('lineRemoveSymbol').value=sm[1]}
+  }
+  const wantsProcess=items.length>0;
+  return{ok:wantsProcess,items,message:wantsProcess?'Hashtag understood your request.':'I could not confidently map that request to a formatter function. Try: “remove duplicates and take every 5 lines and join with colon”.'};
+}
+function hashtagShow(r){const box=$('hashtagResult');box.style.display='block';if(!r.ok){box.innerHTML='<b>Hashtag:</b> '+r.message;return}box.innerHTML='<b>Hashtag understood:</b><br>'+r.items.map(x=>'<span class="hashtag-chip">✓ '+x+'</span>').join('')}
+function hashtagAsk(){const r=hashtagParse($('hashtagInput').value);hashtagShow(r);return r}
+$('hashtagAsk').addEventListener('click',hashtagAsk);
+$('hashtagApply').addEventListener('click',()=>{const r=hashtagAsk();if(!r.ok)return;if(fileInput?.files?.length){processLarge()}else{processText();window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})}});
+$('hashtagClear').addEventListener('click',()=>{$('hashtagInput').value='';$('hashtagResult').style.display='none'});
+$('hashtagInput').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();hashtagAsk()}});
 function opts(){return{removeDuplicates:$('removeDuplicates').checked,removeNumbers:$('removeNumbers').checked,authLines:$('authLines').checked,threeLines:$('threeLines').checked,twoLines:$('twoLines').checked,threeBlockSize:Math.max(1,Math.min(1000,parseInt($('threeBlockSize').value,10)||3)),twoBlockSize:Math.max(1,Math.min(1000,parseInt($('twoBlockSize').value,10)||2)),stripFirstField:$('stripFirstField').checked,removePunctuation:$('removePunctuation').checked,removeEmailSuffix:$('removeEmailSuffix').checked,removeSymbolLines:$('removeSymbolLines').checked,lineRemoveSymbol:$('lineRemoveSymbol').value,singleRemoveSymbol:$('singleRemoveSymbol').value,keyword:$('keepKeyword').value,caseSensitive:$('keepCase').checked,customFormatEnabled:$('customFormatEnabled').checked,customInputFormat:$('customInputFormat').value,customOutputFormat:$('customOutputFormat').value}}
 function processBlock(raw,o){let lines=raw.map(x=>x.trim()).filter(Boolean);if(o.removeNumbers)lines=lines.filter(x=>!isNumberOnly(x));const out=[],buf=[];if(o.customFormatEnabled){const lc=customLabeledBlock(lines,o.customInputFormat,o.customOutputFormat);if(lc!==null){const ks=keywords(o.keyword);return ks.length?(keep(lc,ks,o.caseSensitive)?[lc]:[]):[lc]}}function flush(){if(!buf.length)return;const a=buf.splice(0);const n3=Number(o.threeBlockSize)||3,n2=Number(o.twoBlockSize)||2;if(o.threeLines&&a.length===n3)out.push(a.join(":"));else if(o.twoLines&&a.length===n2)out.push(a.join(":"));else out.push(...a)}for(let line of lines){line=removeTxn(line).trim();line=removeLevel(line);if(o.removeSymbolLines&&o.lineRemoveSymbol&&line.includes(o.lineRemoveSymbol))continue;if(o.singleRemoveSymbol)line=line.split(o.singleRemoveSymbol).join("");if(o.removePunctuation)line=removePunct(line);line=normColon(line);if(o.removeEmailSuffix)line=removeEmail(line);line=line.trim();if(!line)continue;if(o.authLines){const a=auth(line);if(a!==null){flush();out.push(a);continue}}if(o.customFormatEnabled){const c=custom(line,o.customInputFormat,o.customOutputFormat);if(c!==null){flush();out.push(c);continue}}if(o.stripFirstField&&line.includes(":"))line=stripFirst(line);if(line.includes(":")){flush();out.push(line)}else buf.push(line)}flush();const ks=keywords(o.keyword);return ks.length?out.filter(x=>keep(x,ks,o.caseSensitive)):out}
 function processText(){try{const o=opts(),text=normalizeNewlines(input.value||"");if(!text.trim()){output.value="";status.textContent="Paste text into the Input box first.";return}const blocks=[];let cur=[];for(const l of text.split("\n")){if(isBlank(l)){if(cur.length){blocks.push(cur);cur=[]}}else cur.push(l)}if(cur.length)blocks.push(cur);let out=blocks.flatMap(b=>processBlock(b,o));if(o.removeDuplicates){const seen=new Set();out=out.filter(x=>{const k=x.trim();if(!k)return true;if(seen.has(k))return false;seen.add(k);return true})}output.value=out.join("\n");const ks=keywords(o.keyword);status.textContent=`${out.length.toLocaleString()} output line(s) generated from ${blocks.length.toLocaleString()} record block(s)${ks.length?` — ${ks.length} keep-name filter(s) active.`:"."}` }catch(e){output.value="";status.textContent="Processing error: "+(e.message||e);console.error(e)}}
